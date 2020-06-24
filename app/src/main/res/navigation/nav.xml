@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/nav"
+    xmlns:tools="http://schemas.android.com/tools"
+    app:startDestination="@id/checkOpenKeychainFragment">
+
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.tnibler.cryptocam.CameraFragment"
+        tools:layout="@layout/camera_screen"
+        android:label="CameraFragment">
+        <action
+            android:id="@+id/action_cameraFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment"/>
+    </fragment>
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.tnibler.cryptocam.preference.SettingsFragment"
+        android:label="SettingsFragment" />
+    <fragment
+        android:id="@+id/installOpenKeychainFragment"
+        android:name="com.tnibler.cryptocam.onboarding.InstallOpenKeychainFragment"
+        android:label="InstallOpenKeychainFragment"
+        tools:layout="@layout/install_openkeychain" />
+    <fragment
+        android:id="@+id/pickOutputDirFragment"
+        android:name="com.tnibler.cryptocam.onboarding.PickOutputDirFragment"
+        android:label="PickOutputDirFragment"
+        tools:layout="@layout/pick_out_directory"/>
+    <fragment
+        android:id="@+id/pickKeyFragment"
+        android:name="com.tnibler.cryptocam.onboarding.PickKeyFragment"
+        android:label="PickKeyFragment"
+        tools:layout="@layout/pick_key"/>
+    <fragment
+        android:id="@+id/checkOpenKeychainFragment"
+        android:name="com.tnibler.cryptocam.onboarding.CheckOpenKeychainFragment"
+        android:label="CheckOpenKeychainFragment"
+        tools:layout="@layout/check_openkeychain">
+        <action
+            android:id="@+id/action_checkOpenKeychainFragment_to_installOpenKeychainFragment"
+            app:destination="@id/installOpenKeychainFragment"
+            app:popUpTo="@id/checkOpenKeychainFragment"
+            app:popUpToInclusive="true"/>
+    </fragment>
+    <action android:id="@+id/action_global_cameraFragment"
+        app:destination="@id/cameraFragment"
+        app:launchSingleTop="true" />
+    <action
+        android:id="@+id/action_global_pickOutputDirFragment"
+        app:destination="@id/pickOutputDirFragment"
+        app:enterAnim="@android:anim/slide_in_left"
+        app:exitAnim="@android:anim/slide_out_right" />
+    <action
+        android:id="@+id/action_global_pickKeyFragment"
+        app:destination="@id/pickKeyFragment"
+        app:enterAnim="@android:anim/slide_in_left"
+        app:exitAnim="@android:anim/slide_out_right" />
+</navigation>

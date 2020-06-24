@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">Cryptocam</string>
+    <string name="error_openpgp_connection">Connection to OpenPGP service failed. Is OpenKeychain installed?</string>
+    <string name="error_openpgp_permission">Cryptocam needs OpenPgp access to function</string>
+    <string name="error_getting_openpgp_permission">Error checking OpenPgp permissions</string>
+    <string name="select_one_key">Select at least one key</string>
+    <string name="error_picking_directory">Error picking directory</string>
+    <string name="pref_output_directory">Set output directory</string>
+    <string name="choose_output_directory">Choose output directory</string>
+    <string name="pick_out_dir_desc">Create and pick a directory where encrypted files will be saved.</string>
+    <string name="open_file_picker">Open file picker</string>
+    <string name="choose_openpgp_key">Choose OpenPgp key</string>
+    <string name="pick_key_desc">Pick a key from OpenKeychain. The public key will be used to encrypt the recorded videos, and the corresponding private key allows you to decrypt them.</string>
+    <string name="pick_key_warning">Caution: the private key should not be on this device!</string>
+    <string name="open_openkeychain">Open OpenKeychain</string>
+    <string name="get_it_from_f_droid">Get it from F-Droid</string>
+    <string name="install_openkeychain_desc">OpenKeychain is required to encrypt recorded media with public key cryptography.</string>
+    <string name="install_openkeychain">Install OpenKeychain</string>
+    <string name="connecting_to_openkeychain">Connecting to OpenKeychain...</string>
+    <string name="try_again">Try again</string>
+    <string name="pref_output_directory_summary">Encrypted videos will be stored here</string>
+    <string name="pref_pgp_key">Choose OpenPGP key</string>
+    <string name="pref_pgp_key_summary">Videos will be encrypted using this key. Multiple keys are possible.</string>
+    <string name="error_openkeychain_permissions">Error getting OpenKeychain Permissions</string>
+    <string name="video_framerate">Video framerate</string>
+    <string name="pick_key_something_went_wrong">Something went wrong. Please pick at least one key.</string>
+    <string name="error_encrypting">Failed to encrypt file. Make sure you\'ve selected a valid key.</string>
+</resources>
