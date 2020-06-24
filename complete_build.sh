@@ -30,7 +30,7 @@ cd ..
 cd $ANDROIDX_BUILD/frameworks/support
 ./gradlew createArchive
 
-cd $ANDROIDX_BUILD
+cd ../..
 
 cp out/androidx/camera/camera-core/build/outputs/aar/camera-core-release.aar out/androidx/camera/camera-camera2/build/outputs/aar/camera-camera2-release.aar ../app/libs/
 
