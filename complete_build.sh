@@ -24,6 +24,7 @@ git submodule update --recommend-shallow --depth 1 prebuilts/jdk/jdk8
 git submodule update --recommend-shallow --depth 1 tools/external/gradle
 
 
+cd ..
 ./ffmpeg-android-maker/ffmpeg-android-maker.sh
 
 cd $ANDROIDX_BUILD/frameworks/support
