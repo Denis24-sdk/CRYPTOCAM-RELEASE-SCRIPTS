@@ -25,7 +25,12 @@ git submodule update --recommend-shallow --depth 1 tools/external/gradle
 
 
 cd ..
-./ffmpeg-android-maker/ffmpeg-android-maker.sh
+if [ -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavformat.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavutil.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavcodec.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libswscale.so" ]; then
+	echo "ffmpeg already built"
+else
+	echo "rebuilding ffmpeg"
+	./ffmpeg-android-maker/ffmpeg-android-maker.sh
+fi
 
 cd $ANDROIDX_BUILD/frameworks/support
 ./gradlew createArchive
