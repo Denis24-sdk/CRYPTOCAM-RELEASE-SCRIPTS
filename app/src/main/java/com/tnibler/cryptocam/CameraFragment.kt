@@ -192,15 +192,17 @@ class CameraFragment : Fragment() {
             .build()
 
         preview = Preview.Builder()
-            .setTargetAspectRatio(cameraSettings.aspectRatio)
+//            .setTargetAspectRatio(cameraSettings.aspectRatio)
+            .setTargetResolution(getVideoResolution())
             .setTargetRotation(binding.viewFinder.display.rotation)
             .build()
 
+        Log.d(TAG, "Setting resolution to ${getVideoResolution()}")
         val videoCaptureBuilder = VideoStreamCaptureConfig.Builder()
             .setVideoFrameRate(cameraSettings.frameRate)
             .setCameraSelector(cameraSelector)
 //            .setTargetAspectRatio(cameraSettings.aspectRatio)
-            .setTargetResolution(Size(1080, 1920))
+            .setTargetResolution(getVideoResolution())
             .setTargetRotation(binding.viewFinder.display.rotation)
             .setBitRate(cameraSettings.bitrate)
             .setIFrameInterval(2)
@@ -242,11 +244,18 @@ class CameraFragment : Fragment() {
         }
     }
 
+    private fun getVideoResolution(): Size {
+        val r = sharedPreferences.getString(SettingsFragment.PREF_VIDEO_RESOLUTION, SettingsFragment.DEFAULT_RESOLUTION) ?: SettingsFragment.DEFAULT_RESOLUTION
+        val s = r.split("x")
+        return Size(s[1].toInt(), s[0].toInt())
+    }
+
     @SuppressLint("RestrictedApi")
     private fun initRecordingAndOutputFiles(orientation: Orientation) {
         val outputLocation = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
         val keyIds = sharedPreferences.getStringSet(SettingsFragment.PREF_OPENPGP_KEYIDS, setOf())?.map { it.toLong() } ?: listOf()
         val actualRes = videoCapture.attachedSurfaceResolution ?: throw RuntimeException()
+        Toast.makeText(requireContext(), getString(R.string.actual_recording_resolution, actualRes), Toast.LENGTH_LONG).show()
         Log.d(TAG, "actual resolution: $actualRes")
         val onReadyToRecord = {
             Log.d(TAG, "onReadyToRecord")

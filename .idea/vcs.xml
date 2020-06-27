@@ -2,6 +2,19 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/frameworks/support" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/androidx/external" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/androidx/internal" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/fullsdk-linux/build-tools/29.0.3" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/fullsdk-linux/ndk" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/fullsdk-linux/platform-tools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/fullsdk-linux/platforms/android-30" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/fullsdk-linux/tools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/jdk/jdk11" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/prebuilts/jdk/jdk8" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/androidx-build/tools/external/gradle" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/ffmpeg-android-maker" vcs="Git" />
   </component>
 </project>

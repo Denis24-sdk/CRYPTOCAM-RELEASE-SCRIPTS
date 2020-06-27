@@ -25,4 +25,7 @@
     <string name="video_framerate">Video framerate</string>
     <string name="pick_key_something_went_wrong">Something went wrong. Please pick at least one key.</string>
     <string name="error_encrypting">Failed to encrypt file. Make sure you\'ve selected a valid key.</string>
+    <string name="video_resolution">Video resolution</string>
+    <string name="video_resolution_summary">%s (Not all resolutions may be supported)</string>
+    <string name="actual_recording_resolution">Actual recording resolution: %s</string>
 </resources>

@@ -74,24 +74,37 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         val fpsPreference = ListPreference(context).apply {
             setDefaultValue("60")
-            setEntries(arrayOf("30 fps", "60 fps"))
-            setEntryValues(arrayOf("30", "60"))
+            entries = arrayOf("30 fps", "60 fps")
+            entryValues = arrayOf("30", "60")
         }
         fpsPreference.title = getString(R.string.video_framerate)
         fpsPreference.key = PREF_FRAMERATE
         fpsPreference.setValueIndex(0)
         fpsPreference.isPersistent = true
         fpsPreference.setIcon(R.drawable.ic_timer)
+        screen.addPreference(fpsPreference)
         fpsPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { preference, newValue ->
+            fpsPreference.summary = "$newValue fps"
             (preference as ListPreference).value = newValue as String
             true
         }
-        screen.addPreference(fpsPreference)
         fpsPreference.summary = "${fpsPreference.value} fps"
-        fpsPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener {preference, newValue ->
-            fpsPreference.summary = "$newValue fps"
+
+        val resolutionPreference = ListPreference(context).apply {
+            setDefaultValue(DEFAULT_RESOLUTION)
+            entries = arrayOf("1280x720", "1920x1080", "3840x2160")
+            entryValues = entries
+        }
+        resolutionPreference.title = getString(R.string.video_resolution)
+        resolutionPreference.key = PREF_VIDEO_RESOLUTION
+        resolutionPreference.setOnPreferenceChangeListener { preference, newValue ->
+            (preference as ListPreference).value = newValue as String
+            resolutionPreference.summary = getString(R.string.video_resolution_summary, newValue as String)
             true
         }
+
+        screen.addPreference(resolutionPreference)
+        resolutionPreference.summary = getString(R.string.video_resolution_summary, resolutionPreference.value as String)
 
         preferenceScreen = screen
     }
@@ -101,5 +114,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_OUTPUT_DIRECTORY = "mediaOutputLocation"
         const val PREF_OPENPGP_KEYIDS = "openPgpKeyId"
         const val PREF_FRAMERATE = "videoFramerate"
+        const val PREF_VIDEO_RESOLUTION = "videoResolution"
+
+        const val DEFAULT_RESOLUTION = "1920x1080"
     }
 }
