@@ -1,0 +1,1 @@
+Record encrypted video using OpenPGP.
