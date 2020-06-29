@@ -33,6 +33,7 @@ else
 fi
 
 cd $ANDROIDX_BUILD/frameworks/support
+gradle wrapper
 ./gradlew createArchive
 
 cd ../..
@@ -41,4 +42,5 @@ cp out/androidx/camera/camera-core/build/outputs/aar/camera-core-release.aar out
 
 cd ..
 
+gradle wrapper
 ./gradlew assembleDebug
