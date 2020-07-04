@@ -16,6 +16,8 @@ import android.view.*
 import android.view.animation.*
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.camera2.Camera2Config
+import androidx.camera.camera2.MyCamera2Config
 import androidx.camera.core.*
 import androidx.camera.core.impl.VideoStreamCaptureConfig
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -27,6 +29,7 @@ import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.CameraScreenBinding
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
+import java.lang.IllegalStateException
 
 class CameraFragment : Fragment() {
     private val TAG = javaClass.simpleName
@@ -174,6 +177,12 @@ class CameraFragment : Fragment() {
 
     private fun initCamera() {
         Log.d(TAG, "initCamera")
+        try {
+            ProcessCameraProvider.configureInstance(MyCamera2Config.defaultConfig())
+        }
+        catch (e: IllegalStateException) {
+            // already configured
+        }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener(Runnable {
             val cameraProvider = cameraProviderFuture.get()
