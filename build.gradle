@@ -4,7 +4,7 @@ buildscript {
     ext.kotlin_version = '1.3.72'
     repositories {
 //        maven { url 'out/androidx/build/support_repo/' }
-        flatDir { dirs 'libs/aars' }
+//        flatDir { dirs 'libs/aars' }
         google()
         jcenter()
         
