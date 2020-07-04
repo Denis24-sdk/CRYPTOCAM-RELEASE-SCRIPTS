@@ -43,9 +43,8 @@ Transfer the directory where videos are saved to your PC and `cd` to the locatio
 
 ## Building
 
-The app uses a forked version of AndroidX's CameraX library, so the building process is quite involved and takes a while.
-
-Running `./complete_build.sh` will build everything needed. Be aware that it takes 2GB+ of space.
+Before building the app, `ffmpeg` needs to be downloaded and compiled. A complete build can be run with `./complete_build.sh`.
+Subsequent builds can be run through Android Studio or Gradle.
 
 ## Contributing
 
