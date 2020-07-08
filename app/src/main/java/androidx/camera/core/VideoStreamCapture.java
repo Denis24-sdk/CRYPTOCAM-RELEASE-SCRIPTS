@@ -16,6 +16,7 @@
 
 package androidx.camera.core;
 
+import android.annotation.SuppressLint;
 import android.location.Location;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -83,6 +84,7 @@ import javax.crypto.spec.SecretKeySpec;
  * @hide In the earlier stage, the VideoCapture is deprioritized.
  */
 //@RestrictTo(Scope.LIBRARY_GROUP)
+@SuppressLint("RestrictedApi")
 public class VideoStreamCapture extends UseCase {
 
     /**
@@ -281,6 +283,8 @@ public class VideoStreamCapture extends UseCase {
             return;
         }
 
+        mIsFirstAudioSampleWrite.set(false);
+        mIsFirstVideoSampleWrite.set(false);
         try {
             // audioRecord start
             mAudioRecorder.startRecording();
@@ -547,7 +551,7 @@ public class VideoStreamCapture extends UseCase {
 
             synchronized (mMuxerLock) {
                 if (!mIsFirstVideoSampleWrite.get()) {
-                    Log.i(TAG, "First video sample written.");
+                    Log.i(TAG, "First video sample written. " + mVideoBufferInfo.presentationTimeUs);
                     mIsFirstVideoSampleWrite.set(true);
                 }
                 outputBuffer.get(outBytes);
@@ -573,7 +577,7 @@ public class VideoStreamCapture extends UseCase {
             try {
                 synchronized (mMuxerLock) {
                     if (!mIsFirstAudioSampleWrite.get()) {
-                        Log.i(TAG, "First audio sample written.");
+                        Log.i(TAG, "First audio sample written. " + mAudioBufferInfo.presentationTimeUs);
                         mIsFirstAudioSampleWrite.set(true);
                     }
                     byte[] outBytes = new byte[mAudioBufferInfo.size];

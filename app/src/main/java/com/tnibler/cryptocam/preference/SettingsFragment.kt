@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
@@ -106,6 +107,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         screen.addPreference(resolutionPreference)
         resolutionPreference.summary = getString(R.string.video_resolution_summary, resolutionPreference.value as String)
 
+        val overlayPreference = CheckBoxPreference(context)
+        overlayPreference.setDefaultValue(false)
+        overlayPreference.key = PREF_OVERLAY
+        overlayPreference.title = getString(R.string.enable_overlay)
+        overlayPreference.summary = getString(R.string.enable_overlay_summary)
+
+        screen.addPreference(overlayPreference)
+
         preferenceScreen = screen
     }
 
@@ -115,6 +124,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_OPENPGP_KEYIDS = "openPgpKeyId"
         const val PREF_FRAMERATE = "videoFramerate"
         const val PREF_VIDEO_RESOLUTION = "videoResolution"
+        const val PREF_OVERLAY = "enableOverlay"
 
         const val DEFAULT_RESOLUTION = "1920x1080"
     }

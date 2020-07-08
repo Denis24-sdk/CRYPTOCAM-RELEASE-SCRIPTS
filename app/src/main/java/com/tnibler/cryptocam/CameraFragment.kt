@@ -29,6 +29,8 @@ import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.CameraScreenBinding
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.lang.IllegalStateException
 
 class CameraFragment : Fragment() {
@@ -151,6 +153,21 @@ class CameraFragment : Fragment() {
                 toggleFlash()
             }
             setFlashMode(flashMode)
+
+            if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
+                lifecycleScope.launch {
+                    while (true) {
+                        overlayText.visibility = when (overlayText.visibility) {
+                            View.VISIBLE -> View.INVISIBLE
+                            else ->  View.VISIBLE
+                        }
+                        delay(1000)
+                    }
+                }
+            }
+            else {
+                overlayText.visibility = View.GONE
+            }
         }
     }
 
@@ -175,6 +192,7 @@ class CameraFragment : Fragment() {
         }
     }
 
+    @SuppressLint("UnsafeExperimentalUsageError")
     private fun initCamera() {
         Log.d(TAG, "initCamera")
         try {
@@ -240,16 +258,25 @@ class CameraFragment : Fragment() {
             }
         })
 
-        binding.viewFinder.setOnTouchListener { v, event ->
-            scaleGestureDetector.onTouchEvent(event)
-            if (event.action != MotionEvent.ACTION_DOWN) {
-                return@setOnTouchListener false
+        val gestureDetector = GestureDetector(requireContext(), object :
+            GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+                val factory = binding.viewFinder.createMeteringPointFactory(cameraSelector)
+                val point = factory.createPoint(event.x, event.y)
+                val action = FocusMeteringAction.Builder(point).build()
+                camera.cameraControl.startFocusAndMetering(action)
+                return true
             }
-            val factory = binding.viewFinder.createMeteringPointFactory(cameraSelector)
-            val point = factory.createPoint(event.x, event.y)
-            val action = FocusMeteringAction.Builder(point).build()
-            camera.cameraControl.startFocusAndMetering(action)
-            return@setOnTouchListener true
+        })
+
+        binding.viewFinder.setOnTouchListener { v, event ->
+            if (gestureDetector.onTouchEvent(event)) {
+                return@setOnTouchListener true
+            }
+            if (scaleGestureDetector.onTouchEvent(event)) {
+                return@setOnTouchListener true
+            }
+            false
         }
     }
 

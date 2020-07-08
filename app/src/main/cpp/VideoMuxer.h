@@ -29,6 +29,9 @@ class VideoMuxer {
     int videoStreamIndex;
     int audioStreamIndex;
 
+    bool writtenVideo;
+    bool writtenAudio;
+    int firstVideoPts;
 public:
     VideoMuxer();
     int init(int fd, VideoInfo info, AudioInfo audioInfo, const char key[16]);

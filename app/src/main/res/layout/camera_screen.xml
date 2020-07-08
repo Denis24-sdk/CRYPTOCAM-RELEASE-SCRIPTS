@@ -38,6 +38,7 @@
         android:layout_marginEnd="4dp"/>
 
     <View
+        android:id="@+id/overlayControls"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:alpha="0.4"
@@ -99,6 +100,19 @@
             tools:text="12:34"/>
 
     </LinearLayout>
+
+    <ImageView
+        android:id="@+id/overlayText"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:src="@drawable/overlay_text"
+        android:rotation="90"
+        android:scaleType="fitCenter"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/overlayControls"/>
+
 
 
 

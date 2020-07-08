@@ -28,4 +28,6 @@
     <string name="video_resolution">Video resolution</string>
     <string name="video_resolution_summary">%s (Not all resolutions may be supported)</string>
     <string name="actual_recording_resolution">Actual recording resolution: %s</string>
+    <string name="enable_overlay">Enable overlay</string>
+    <string name="enable_overlay_summary">Let others around you know that your recordings are safely encrypted</string>
 </resources>

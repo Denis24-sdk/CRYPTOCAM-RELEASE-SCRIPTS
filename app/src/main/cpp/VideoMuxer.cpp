@@ -48,8 +48,8 @@ int VideoMuxer::init(int fd, VideoInfo videoInfo, AudioInfo audioInfo, const cha
     videoStream->codecpar->width = videoInfo.width;
     videoStream->codecpar->height = videoInfo.height;
     videoStream->time_base.num = 1;
-    videoStream->time_base.den = videoInfo.framerate * 10;
-    LOGD("setting rotation to %d", videoInfo.rotation);
+    videoStream->time_base.den = 90000;
+    LOGD("setting rotation to %d, time base den to %d", videoInfo.rotation, videoStream->time_base.den);
     av_dict_set_int(&videoStream->metadata, "rotate", (videoInfo.rotation + 360) % 360, 0);
 
     /* Set up audio stream */
@@ -62,7 +62,7 @@ int VideoMuxer::init(int fd, VideoInfo videoInfo, AudioInfo audioInfo, const cha
     audioStream->codecpar->sample_rate = audioInfo.sampleRate;
     audioStream->codecpar->channels = audioInfo.channelCount;
     audioStream->time_base.num = 1;
-    audioStream->time_base.den = 9000;
+    audioStream->time_base.den = 90000;
 
     AVDictionary *opts = nullptr;
     LOGD("Setting options");
@@ -74,6 +74,7 @@ int VideoMuxer::init(int fd, VideoInfo videoInfo, AudioInfo audioInfo, const cha
         LOGE("Error writing header.");
         return 1;
     }
+    writtenAudio = writtenVideo = false;
     running = true;
     LOGD("Successfully initialized muxer.");
     return 0;
@@ -94,19 +95,32 @@ int VideoMuxer::writeVideoFrame(uint8_t *data, int size, int64_t presentationTim
     // maybe check if we're waiting for keyframe
 //    pkt.dts = AV_NOPTS_VALUE;
     pkt.pts = presentationTimeUs;
+    if (writtenVideo) {
+        pkt.pts -= firstVideoPts;
+    }
     av_packet_rescale_ts(&pkt, AVRational { 1, 1000000}, outputContext->streams[videoStreamIndex]->time_base);
     pkt.dts = AV_NOPTS_VALUE;
     pkt.stream_index = videoStreamIndex;
+    if (!writtenVideo) {
+        AVStream* videoStream = outputContext->streams[videoStreamIndex];
+        LOGD("Writing first video packet: pts = %lld. Video time base %d/%d", pkt.pts, videoStream->time_base.num, videoStream->time_base.den);
+        videoStream->start_time = pkt.pts;
+        firstVideoPts = presentationTimeUs;
+    }
 //    LOGD("Writing frame.");
     if (av_interleaved_write_frame(outputContext, &pkt) < 0) {
         LOGE("Error writing frame");
         return 1;
     }
 //    LOGD("Finished writing frame");
+    writtenVideo = true;
     return 0;
 }
 
 int VideoMuxer::writeAudioFrame(uint8_t *data, int size, int64_t presentationTimeUs) {
+    if (!writtenVideo) {
+        return 0;
+    }
     if (audioStreamIndex < 0 || !running) {
         LOGD("Not writing audio frame");
         return 1;
@@ -120,11 +134,16 @@ int VideoMuxer::writeAudioFrame(uint8_t *data, int size, int64_t presentationTim
     av_packet_rescale_ts(&pkt, AVRational { 1, 1000000}, outputContext->streams[audioStreamIndex]->time_base);
     pkt.flags |= AV_PKT_FLAG_KEY;
     pkt.dts = AV_NOPTS_VALUE;
+    if (!writtenAudio) {
+        outputContext->streams[audioStreamIndex]->start_time = pkt.pts;
+        LOGD("Writing first audio packet: pts = %lld", pkt.pts);
+    }
     if (av_interleaved_write_frame(outputContext, &pkt) < 0) {
         LOGE("Error writing audio frame");
         return 1;
     }
 //    LOGD("Finished writing audio frame");
+    writtenAudio = true;
     return 0;
 }
 
