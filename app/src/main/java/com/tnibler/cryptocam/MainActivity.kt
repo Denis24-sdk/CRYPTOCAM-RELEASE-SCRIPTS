@@ -47,9 +47,8 @@ class MainActivity : AppCompatActivity() {
             setTurnScreenOn(true)
         }
         else {
-            window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN)
         }
         requestWindowFeature(Window.FEATURE_NO_TITLE)

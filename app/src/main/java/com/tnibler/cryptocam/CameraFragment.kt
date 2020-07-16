@@ -291,7 +291,7 @@ class CameraFragment : Fragment() {
         val outputLocation = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
         val keyIds = sharedPreferences.getStringSet(SettingsFragment.PREF_OPENPGP_KEYIDS, setOf())?.map { it.toLong() } ?: listOf()
         val actualRes = videoCapture.attachedSurfaceResolution ?: throw RuntimeException()
-        Toast.makeText(requireContext(), getString(R.string.actual_recording_resolution, actualRes), Toast.LENGTH_LONG).show()
+//        Toast.makeText(requireContext(), getString(R.string.actual_recording_resolution, actualRes), Toast.LENGTH_LONG).show()
         Log.d(TAG, "actual resolution: $actualRes")
         val onReadyToRecord = {
             Log.d(TAG, "onReadyToRecord")
