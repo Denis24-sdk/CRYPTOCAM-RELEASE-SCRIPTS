@@ -21,13 +21,11 @@ import android.location.Location;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.CamcorderProfile;
-import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodec.BufferInfo;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.media.MediaFormat;
-import android.media.MediaMuxer;
 import android.media.MediaRecorder.AudioSource;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -42,38 +40,26 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
-import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.core.impl.CameraInternal;
+import androidx.camera.core.impl.Config;
 import androidx.camera.core.impl.ConfigProvider;
 import androidx.camera.core.impl.DeferrableSurface;
-import androidx.camera.core.impl.ImageOutputConfig;
 import androidx.camera.core.impl.ImageOutputConfig.RotationValue;
 import androidx.camera.core.impl.ImmediateSurface;
 import androidx.camera.core.impl.SessionConfig;
 import androidx.camera.core.impl.UseCaseConfig;
+import androidx.camera.core.impl.UseCaseConfigFactory;
 import androidx.camera.core.impl.VideoStreamCaptureConfig;
 import androidx.camera.core.impl.utils.executor.CameraXExecutors;
-import androidx.camera.core.internal.utils.UseCaseConfigUtil;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.crypto.Cipher;
-import javax.crypto.CipherOutputStream;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.SecretKeySpec;
 
 /**
  * A use case for taking a video.
@@ -212,23 +198,24 @@ public class VideoStreamCapture extends UseCase {
         return format;
     }
 
-
-    /**
-     * {@inheritDoc}
-     *
-     * @hide
-     */
-    @Override
     @Nullable
-    @RestrictTo(Scope.LIBRARY_GROUP)
-    public UseCaseConfig.Builder<?, ?, ?> getDefaultBuilder(@Nullable CameraInfo cameraInfo) {
-        VideoStreamCaptureConfig defaults = CameraX.getDefaultUseCaseConfig(VideoStreamCaptureConfig.class,
-                cameraInfo);
-        if (defaults != null) {
-            return VideoStreamCaptureConfig.Builder.fromConfig(defaults);
-        }
+    @Override
+    public UseCaseConfig<?> getDefaultConfig(@NonNull UseCaseConfigFactory factory) {
+        Config captureConfig = factory.getConfig(VideoStreamCaptureConfig.class);
+        return captureConfig == null ? null :
+                getUseCaseConfigBuilder(captureConfig).getUseCaseConfig();
+    }
 
-        return null;
+    @NonNull
+    @Override
+    public UseCaseConfig.Builder<?, ?, ?> getUseCaseConfigBuilder(@NonNull Config config) {
+        return VideoStreamCaptureConfig.Builder.fromConfig(config);
+    }
+
+    @NonNull
+    @Override
+    public UseCaseConfig.Builder<?, ?, ?> getUseCaseConfigBuilder() {
+        return VideoStreamCaptureConfig.Builder.fromConfig(getCurrentConfig());
     }
 
     /**
@@ -311,10 +298,6 @@ public class VideoStreamCapture extends UseCase {
             return;
         }
 
-        CameraInfoInternal cameraInfoInternal = attachedCamera.getCameraInfoInternal();
-        int relativeRotation = cameraInfoInternal.getSensorRotationDegrees(
-                ((ImageOutputConfig) getUseCaseConfig()).getTargetRotation(Surface.ROTATION_0));
-
  /*       try {
             synchronized (mMuxerLock) {
                 mMuxer =
@@ -381,14 +364,7 @@ public class VideoStreamCapture extends UseCase {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @hide
-     */
-    //@RestrictTo(Scope.LIBRARY_GROUP)
-    @Override
-    public void clear() {
+    private void releaseResources() {
         mVideoHandlerThread.quitSafely();
 
         // audio encoder release
@@ -442,15 +418,7 @@ public class VideoStreamCapture extends UseCase {
      * @param rotation Desired rotation of the output video.
      */
     public void setTargetRotation(@RotationValue int rotation) {
-        VideoStreamCaptureConfig oldConfig = (VideoStreamCaptureConfig) getUseCaseConfig();
-        VideoStreamCaptureConfig.Builder builder = VideoStreamCaptureConfig.Builder.fromConfig(oldConfig);
-        int oldRotation = oldConfig.getTargetRotation(ImageOutputConfig.INVALID_ROTATION);
-        if (oldRotation == ImageOutputConfig.INVALID_ROTATION || oldRotation != rotation) {
-            UseCaseConfigUtil.updateTargetRotationAndRelatedConfigs(builder, rotation);
-            updateUseCaseConfig(builder.getUseCaseConfig());
-
-            // TODO(b/122846516): Update session configuration and possibly reconfigure session.
-        }
+        setTargetRotationInternal(rotation);
     }
 
     /**
@@ -459,7 +427,7 @@ public class VideoStreamCapture extends UseCase {
      */
     @SuppressWarnings("WeakerAccess") /* synthetic accessor */
     void setupEncoder(@NonNull String cameraId, @NonNull Size resolution) {
-        VideoStreamCaptureConfig config = (VideoStreamCaptureConfig) getUseCaseConfig();
+        VideoStreamCaptureConfig config = (VideoStreamCaptureConfig) getCurrentConfig();
 
         // video encoder setup
         mVideoEncoder.reset();
@@ -840,11 +808,18 @@ public class VideoStreamCapture extends UseCase {
         // In case no corresponding camcorder profile can be founded, * get default value from
         // VideoStreamCaptureConfig.
         if (!isCamcorderProfileFound) {
-            VideoStreamCaptureConfig config = (VideoStreamCaptureConfig) getUseCaseConfig();
+            VideoStreamCaptureConfig config = (VideoStreamCaptureConfig) getCurrentConfig();
             mAudioChannelCount = config.getAudioChannelCount();
             mAudioSampleRate = config.getAudioSampleRate();
             mAudioBitRate = config.getAudioBitRate();
         }
+    }
+
+    @Override
+    public void onDetached() {
+        stopRecording();
+
+        releaseResources();
     }
 
     public void setEncodedBufferHandler(androidx.camera.core.EncodedBufferHandler encodedBufferHandler) {
@@ -938,7 +913,7 @@ public class VideoStreamCapture extends UseCase {
 
         @NonNull
         @Override
-        public VideoStreamCaptureConfig getConfig(@Nullable CameraInfo cameraInfo) {
+        public VideoStreamCaptureConfig getConfig() {
             return DEFAULT_CONFIG;
         }
     }

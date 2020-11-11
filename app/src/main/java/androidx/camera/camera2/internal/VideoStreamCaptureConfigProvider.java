@@ -16,17 +16,12 @@
 
 package androidx.camera.camera2.internal;
 
-import static androidx.camera.core.impl.ImageOutputConfig.DEFAULT_ASPECT_RATIO_LANDSCAPE;
-import static androidx.camera.core.impl.ImageOutputConfig.DEFAULT_ASPECT_RATIO_PORTRAIT;
-
 import android.content.Context;
 import android.hardware.camera2.CameraDevice;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.camera.core.CameraInfo;
-import androidx.camera.core.VideoCapture;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.VideoStreamCapture;
 import androidx.camera.core.impl.CaptureConfig;
 import androidx.camera.core.impl.ConfigProvider;
@@ -47,12 +42,11 @@ public final class VideoStreamCaptureConfigProvider implements ConfigProvider<Vi
 
     @Override
     @NonNull
-    public VideoStreamCaptureConfig getConfig(@Nullable CameraInfo cameraInfo) {
+    public VideoStreamCaptureConfig getConfig() {
         VideoStreamCaptureConfig.Builder builder =
                 VideoStreamCaptureConfig.Builder.fromConfig(
-                        VideoStreamCapture.DEFAULT_CONFIG.getConfig(cameraInfo));
+                        VideoStreamCapture.DEFAULT_CONFIG.getConfig());
 
-        // SessionConfig containing all intrinsic properties needed for VideoCapture
         SessionConfig.Builder sessionBuilder = new SessionConfig.Builder();
         // TODO(b/114762170): Must set to preview here until we allow for multiple template types
         sessionBuilder.setTemplateType(CameraDevice.TEMPLATE_PREVIEW);
@@ -65,17 +59,11 @@ public final class VideoStreamCaptureConfigProvider implements ConfigProvider<Vi
         captureBuilder.setTemplateType(CameraDevice.TEMPLATE_PREVIEW);
         builder.setDefaultCaptureConfig(captureBuilder.build());
         builder.setCaptureOptionUnpacker(Camera2CaptureOptionUnpacker.INSTANCE);
+        builder.setTargetAspectRatio(AspectRatio.RATIO_16_9);
 
+        // TODO(b/160477756): Make UseCase default config providers only provider static configs
         int targetRotation = mWindowManager.getDefaultDisplay().getRotation();
         builder.setTargetRotation(targetRotation);
-
-        // Add options that requires camera info to UseCaseConfig
-        if (cameraInfo != null) {
-            int rotationDegrees = cameraInfo.getSensorRotationDegrees(targetRotation);
-            boolean isRotateNeeded = (rotationDegrees == 90 || rotationDegrees == 270);
-            builder.setTargetAspectRatioCustom(isRotateNeeded ? DEFAULT_ASPECT_RATIO_PORTRAIT
-                    : DEFAULT_ASPECT_RATIO_LANDSCAPE);
-        }
 
         return builder.getUseCaseConfig();
     }

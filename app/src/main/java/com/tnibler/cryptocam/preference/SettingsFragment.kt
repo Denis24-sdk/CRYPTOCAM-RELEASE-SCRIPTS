@@ -1,14 +1,12 @@
 package com.tnibler.cryptocam.preference
 
-import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
@@ -20,15 +18,27 @@ import com.tnibler.cryptocam.R
 class SettingsFragment : PreferenceFragmentCompat() {
     private val TAG = javaClass.simpleName
 
+    private val chooseKeyActivityResult =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            chooseKeyResultListener?.invoke(result)
+        }
+
+    // gross, but we have to register all activity result listeners now so we can't
+    private var chooseKeyResultListener: ((ActivityResult) -> Unit)? = null
+    private fun setChooseKeyResultListener(listener: (ActivityResult) -> Unit) {
+        chooseKeyResultListener = listener
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val context = preferenceManager.context
         val screen = preferenceManager.createPreferenceScreen(context)
         rootKey?.let { screen.key = rootKey }
 
-        val requestDirectory = registerForActivityResult(object : ActivityResultContracts.OpenDocumentTree() {
-            override fun createIntent(context: Context, input: Uri?): Intent {
-                return super.createIntent(context, input).apply {
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        val requestDirectory =
+            registerForActivityResult(object : ActivityResultContracts.OpenDocumentTree() {
+                override fun createIntent(context: Context, input: Uri?): Intent {
+                    return super.createIntent(context, input).apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
                 }
             }
         }) { uri ->
@@ -59,11 +69,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
         keyPreference.setIcon(R.drawable.ic_key)
         keyPreference.setOnPreferenceClickListener {
             val mainActivity = (requireActivity() as MainActivity)
-            mainActivity.openPgpKeyManager.chooseKey(this) { ok, keyIds ->
+            mainActivity.openPgpKeyManager.chooseKey(
+                chooseKeyActivityResult,
+                ::setChooseKeyResultListener
+            ) { ok, keyIds ->
                 if (!ok) {
-                    Toast.makeText(requireContext(), getString(R.string.pick_key_something_went_wrong), Toast.LENGTH_LONG).show()
-                }
-                else {
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.pick_key_something_went_wrong),
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
                     preferenceManager.sharedPreferences.edit {
                         putStringSet(PREF_OPENPGP_KEYIDS, keyIds.map { it.toString() }.toSet())
                     }
@@ -100,7 +116,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         resolutionPreference.key = PREF_VIDEO_RESOLUTION
         resolutionPreference.setOnPreferenceChangeListener { preference, newValue ->
             (preference as ListPreference).value = newValue as String
-            resolutionPreference.summary = getString(R.string.video_resolution_summary, newValue as String)
+            resolutionPreference.summary = getString(R.string.video_resolution_summary, newValue)
             true
         }
 

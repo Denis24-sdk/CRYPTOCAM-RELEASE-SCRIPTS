@@ -16,8 +16,6 @@
 
 package androidx.camera.camera2;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
 import androidx.camera.camera2.internal.Camera2CameraFactory;
@@ -58,9 +56,9 @@ public final class MyCamera2Config {
         CameraFactory.Provider cameraFactoryProvider = Camera2CameraFactory::new;
 
         // Create the DeviceSurfaceManager for Camera2
-        CameraDeviceSurfaceManager.Provider surfaceManagerProvider = context -> {
+        CameraDeviceSurfaceManager.Provider surfaceManagerProvider = (context, cameraManager) -> {
             try {
-                return new Camera2DeviceSurfaceManager(context);
+                return new Camera2DeviceSurfaceManager(context, cameraManager);
             } catch (CameraUnavailableException e) {
                 throw new InitializationException(e);
             }

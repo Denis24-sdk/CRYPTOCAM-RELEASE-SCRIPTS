@@ -129,21 +129,37 @@ class MainActivity : AppCompatActivity() {
                 ?: return false
             val df = DocumentFile.fromTreeUri(this, Uri.parse(savedUri)) ?: return false
             df.listFiles()
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             return false
         }
         return true
     }
 
+    val openPGPUserInteractionActivityResult =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode != Activity.RESULT_OK) {
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.error_openkeychain_permissions),
+                    Toast.LENGTH_LONG
+                ).show()
+                finish()
+            }
+            navController.popBackStack(R.id.checkOpenKeychainFragment, true)
+            nextOnboardingScreen(R.id.checkOpenKeychainFragment)
+        }
+
     fun connectOpenPgp() {
         val app = (application as App)
         val conn =
-            OpenPgpServiceConnection(this, "org.sufficientlysecure.keychain", object : OpenPgpServiceConnection.OnBound {
-                override fun onError(e: Exception?) {
+            OpenPgpServiceConnection(
+                this,
+                "org.sufficientlysecure.keychain",
+                object : OpenPgpServiceConnection.OnBound {
+                    override fun onError(e: Exception?) {
 //                    Toast.makeText(this@MainActivity, R.string.error_openpgp_connection, Toast.LENGTH_LONG).show()
-                    navController.navigate(R.id.action_checkOpenKeychainFragment_to_installOpenKeychainFragment)
-                }
+                        navController.navigate(R.id.action_checkOpenKeychainFragment_to_installOpenKeychainFragment)
+                    }
 
                 override fun onBound(service: IOpenPgpService2?) {
                     Log.d(TAG, "OpenPGP service bound.")
@@ -162,16 +178,8 @@ class MainActivity : AppCompatActivity() {
                         OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED -> {
                             val pi = result.getParcelableExtra<PendingIntent>(OpenPgpApi.RESULT_INTENT)
                             val intentSenderRequest = IntentSenderRequest.Builder(pi).build()
-                            val interaction = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                                if (result.resultCode != Activity.RESULT_OK) {
-                                    Toast.makeText(this@MainActivity, getString(R.string.error_openkeychain_permissions), Toast.LENGTH_LONG).show()
-                                    finish()
-                                }
-                                navController.popBackStack(R.id.checkOpenKeychainFragment, true)
-                                nextOnboardingScreen(R.id.checkOpenKeychainFragment)
-                            }
                             try {
-                                interaction.launch(intentSenderRequest)
+                                openPGPUserInteractionActivityResult.launch(intentSenderRequest)
                             }
                             catch (e: IntentSender.SendIntentException) {
                                 Log.e(TAG, "SendIntentException", e)

@@ -13,10 +13,11 @@ import android.os.Handler
 import android.util.Log
 import android.util.Size
 import android.view.*
-import android.view.animation.*
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+import android.view.animation.DecelerateInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.camera2.Camera2Config
 import androidx.camera.camera2.MyCamera2Config
 import androidx.camera.core.*
 import androidx.camera.core.impl.VideoStreamCaptureConfig
@@ -31,7 +32,6 @@ import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.lang.IllegalStateException
 
 class CameraFragment : Fragment() {
     private val TAG = javaClass.simpleName
@@ -240,7 +240,7 @@ class CameraFragment : Fragment() {
 
         try {
             cameraProvider?.unbindAll()
-            preview.setSurfaceProvider(binding.viewFinder.createSurfaceProvider())
+            preview.setSurfaceProvider(binding.viewFinder.surfaceProvider)
         }
         catch (e: Exception) {
             Log.e(TAG, "Failed to bind use case", e)
@@ -261,7 +261,7 @@ class CameraFragment : Fragment() {
         val gestureDetector = GestureDetector(requireContext(), object :
             GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
-                val factory = binding.viewFinder.createMeteringPointFactory(cameraSelector)
+                val factory = binding.viewFinder.meteringPointFactory
                 val point = factory.createPoint(event.x, event.y)
                 val action = FocusMeteringAction.Builder(point).build()
                 camera.cameraControl.startFocusAndMetering(action)

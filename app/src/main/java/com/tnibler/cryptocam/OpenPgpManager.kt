@@ -3,11 +3,10 @@ package com.tnibler.cryptocam
 import android.app.PendingIntent
 import android.content.Intent
 import android.util.Log
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.fragment.app.Fragment
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.openintents.openpgp.OpenPgpError
 import org.openintents.openpgp.util.OpenPgpApi
@@ -17,19 +16,30 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class OpenPgpManager() {
+class OpenPgpManager {
     private val TAG = javaClass.simpleName
     private val scope = GlobalScope
     var status: OpenPgpStatus = OpenPgpStatus.NOT_BOUND
     lateinit var api: OpenPgpApi
 
-    enum class  OpenPgpStatus {
+    enum class OpenPgpStatus {
         BOUND,
         NOT_BOUND
     }
 
-    fun chooseKey(fragment: Fragment, onKeyChosen: (Boolean, List<Long>) -> Unit) {
-        scope.launch { getKeyIds(Intent(), onKeyChosen, fragment) }
+    fun chooseKey(
+        chooseKeyActivityResult: ActivityResultLauncher<IntentSenderRequest>,
+        setChooseKeyActivityResultListener: ((ActivityResult) -> Unit) -> Unit,
+        onKeyChosen: (Boolean, List<Long>) -> Unit
+    ) {
+        scope.launch {
+            getKeyIds(
+                Intent(),
+                onKeyChosen,
+                chooseKeyActivityResult,
+                setChooseKeyActivityResultListener
+            )
+        }
     }
 
     fun encryptText(text: String, out: OutputStream, keyIds: Collection<Long>) {
@@ -74,27 +84,46 @@ class OpenPgpManager() {
         }
     }
 
-    private fun getKeyIds(data: Intent, onKeyChosen: (Boolean, List<Long>) -> Unit, fragment: Fragment) {
+    private fun getKeyIds(
+        data: Intent,
+        onKeyChosen: (Boolean, List<Long>) -> Unit,
+        chooseKeyActivityResult: ActivityResultLauncher<IntentSenderRequest>,
+        setChooseKeyActivityResultListener: ((ActivityResult) -> Unit) -> Unit
+    ) {
         Log.d(TAG, "getKeyIds: $data")
         data.action = OpenPgpApi.ACTION_GET_KEY_IDS
         val result = api.executeApi(data, null as InputStream?, null)
         when (result.getIntExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_ERROR)) {
             OpenPgpApi.RESULT_CODE_ERROR -> {
-                Log.e(TAG, "OpenPgp error: ${result.getParcelableExtra<OpenPgpError>(OpenPgpApi.RESULT_ERROR)}")
+                Log.e(
+                    TAG,
+                    "OpenPgp error: ${result.getParcelableExtra<OpenPgpError>(OpenPgpApi.RESULT_ERROR)}"
+                )
                 onKeyChosen(false, listOf())
             }
             OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED -> {
-                val pi: PendingIntent = result.getParcelableExtra<PendingIntent>(OpenPgpApi.RESULT_INTENT) ?: run {
-                    Log.w(TAG, "User interaction required but pending intent null.")
-                    onKeyChosen(false, listOf())
-                    return
-                }
+                val pi: PendingIntent =
+                    result.getParcelableExtra<PendingIntent>(OpenPgpApi.RESULT_INTENT) ?: run {
+                        Log.w(TAG, "User interaction required but pending intent null.")
+                        onKeyChosen(false, listOf())
+                        return
+                    }
                 val intentSenderRequest = IntentSenderRequest.Builder(pi).build()
-                val chooseKey = fragment.registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                    val data = result?.data ?: run { onKeyChosen(false, listOf()); return@registerForActivityResult }
-                    getKeyIds(data, onKeyChosen, fragment)
+                setChooseKeyActivityResultListener { result ->
+                    val data = result.data ?: run {
+                        onKeyChosen(
+                            false,
+                            listOf()
+                        ); return@setChooseKeyActivityResultListener
+                    }
+                    getKeyIds(
+                        data,
+                        onKeyChosen,
+                        chooseKeyActivityResult,
+                        setChooseKeyActivityResultListener
+                    )
                 }
-                chooseKey.launch(intentSenderRequest)
+                chooseKeyActivityResult.launch(intentSenderRequest)
             }
             OpenPgpApi.RESULT_CODE_SUCCESS -> {
                 val ids = result.getLongArrayExtra(OpenPgpApi.RESULT_KEY_IDS)
