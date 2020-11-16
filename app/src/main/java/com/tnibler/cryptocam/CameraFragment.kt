@@ -71,36 +71,8 @@ class CameraFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         Log.d(TAG, "onViewCreated")
         binding.run {
-            orientationEventListener =
-                object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
-                    override fun onOrientationChanged(orientation: Int) {
-                        val currentOrientation = when (orientation) {
-                            in 75..134 -> Orientation.LAND_RIGHT
-                            in 224..289 -> Orientation.LAND_LEFT
-                            else -> Orientation.PORTRAIT
-                        }
-                        if (currentOrientation != lastHandledOrientation) {
-                            val rotateTo = when (currentOrientation) {
-                                Orientation.LAND_LEFT -> 90.also { Log.d(TAG, "land left") }
-                                Orientation.LAND_RIGHT -> (-90).also { Log.d(TAG, "land right") }
-                                Orientation.PORTRAIT -> 0.also { Log.d(TAG, "portrait") }
-                            }
-                            rotateUiTo(rotateTo)
-                            if (recordingManager!!.state == RecordingManager.State.NOT_RECORDING) {
-                                initRecordingAndOutputFiles(currentOrientation)
-                            }
-                        }
-                        lastHandledOrientation = currentOrientation
-                    }
-                }
 
-            if (allPermissionsGranted()) {
-                // wait until views are all set up otherwise viewFinder.display may be null
-                binding.viewFinder.post {
-                    Log.d(TAG, "onStart: initializing camera")
-                    initCamera()
-                }
-            } else {
+            if (!allPermissionsGranted()) {
                 val requestPermissions = ActivityResultContracts.RequestMultiplePermissions()
                 registerForActivityResult(requestPermissions) { result ->
                     if (allPermissionsGranted()) {
@@ -108,12 +80,21 @@ class CameraFragment : Fragment() {
                             initCamera()
                         }
                     } else {
-                        Toast.makeText(requireContext(),
+                        Toast.makeText(
+                            requireContext(),
                             "Permissions not granted by the user.",
-                            Toast.LENGTH_SHORT).show()
+                            Toast.LENGTH_SHORT
+                        ).show()
                         activity?.finish()
                     }
                 }.launch(REQUIRED_PERMISSIONS)
+                return
+            }
+
+            // wait until views are all set up otherwise viewFinder.display may be null
+            viewFinder.post {
+                Log.d(TAG, "onStart: initializing camera")
+                initCamera()
             }
             sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
             displayManager =
@@ -420,6 +401,32 @@ class CameraFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        orientationEventListener =
+            object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
+                override fun onOrientationChanged(orientation: Int) {
+                    Log.d(
+                        TAG,
+                        "onOrientationChanged, orientation=$orientation, recordingManager==$recordingManager"
+                    )
+                    val currentOrientation = when (orientation) {
+                        in 75..134 -> Orientation.LAND_RIGHT
+                        in 224..289 -> Orientation.LAND_LEFT
+                        else -> Orientation.PORTRAIT
+                    }
+                    if (currentOrientation != lastHandledOrientation) {
+                        val rotateTo = when (currentOrientation) {
+                            Orientation.LAND_LEFT -> 90.also { Log.d(TAG, "land left") }
+                            Orientation.LAND_RIGHT -> (-90).also { Log.d(TAG, "land right") }
+                            Orientation.PORTRAIT -> 0.also { Log.d(TAG, "portrait") }
+                        }
+                        rotateUiTo(rotateTo)
+                        if (recordingManager?.state == RecordingManager.State.NOT_RECORDING) {
+                            initRecordingAndOutputFiles(currentOrientation)
+                        }
+                    }
+                    lastHandledOrientation = currentOrientation
+                }
+            }
         orientationEventListener.enable()
     }
 
