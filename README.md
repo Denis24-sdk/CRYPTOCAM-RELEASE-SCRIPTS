@@ -2,6 +2,10 @@
 
 Recording certain situations can be dangerous for the person using the camera as well as the people being recorded. To mitigate the risk of the recording device or storage medium getting into the hands of an attacker with an interest in the recordings, Cryptocam allows you to record video and audio that is encrypted on the fly and never persisted to disk in cleartext form.
 
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+     alt="Get it on F-Droid"
+     height="80">](https://f-droid.org/packages/com.tnibler.cryptocam/)
+
 ## How it works
 
 Cryptocam uses ffmpeg/libav's MP4-CENC functionality to encrypt video and audio at the sample level using AES-128. An AES key is generated for each recording and encrypted through OpenPGP along with other metadata before being written to disk.
