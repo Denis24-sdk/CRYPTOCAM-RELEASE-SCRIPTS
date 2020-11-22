@@ -52,7 +52,9 @@ class CameraFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate")
-        cameraSettings = CameraSettings(PreferenceManager.getDefaultSharedPreferences(requireContext()))
+        cameraSettings =
+            CameraSettings(PreferenceManager.getDefaultSharedPreferences(requireContext()))
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
     }
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         Log.d(TAG, "onCreateView")
@@ -96,7 +98,6 @@ class CameraFragment : Fragment() {
                 Log.d(TAG, "onStart: initializing camera")
                 initCamera()
             }
-            sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
             displayManager =
                 requireContext().getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             btnToggleCamera.setOnClickListener { toggleCamera() }
