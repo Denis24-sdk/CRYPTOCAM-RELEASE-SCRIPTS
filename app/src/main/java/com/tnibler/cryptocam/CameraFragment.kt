@@ -72,84 +72,88 @@ class CameraFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Log.d(TAG, "onViewCreated")
-        binding.run {
 
-            if (!allPermissionsGranted()) {
-                val requestPermissions = ActivityResultContracts.RequestMultiplePermissions()
-                registerForActivityResult(requestPermissions) { result ->
-                    if (allPermissionsGranted()) {
-                        binding.viewFinder.post {
-                            initCamera()
-                        }
-                    } else {
-                        Toast.makeText(
-                            requireContext(),
-                            "Permissions not granted by the user.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        activity?.finish()
+        if (!allPermissionsGranted()) {
+            val requestPermissions = ActivityResultContracts.RequestMultiplePermissions()
+            registerForActivityResult(requestPermissions) { result ->
+                if (allPermissionsGranted()) {
+                    binding.viewFinder.post {
+                        setupUi()
                     }
-                }.launch(REQUIRED_PERMISSIONS)
-                return
-            }
+                } else {
+                    Toast.makeText(
+                        requireContext(),
+                        "Permissions not granted by the user.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    activity?.finish()
+                }
+            }.launch(REQUIRED_PERMISSIONS)
+            return
+        }
+        setupUi()
+    }
 
-            // wait until views are all set up otherwise viewFinder.display may be null
-            viewFinder.post {
-                Log.d(TAG, "onStart: initializing camera")
-                initCamera()
-            }
-            displayManager =
-                requireContext().getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-            btnToggleCamera.setOnClickListener { toggleCamera() }
+    private fun setupUi() = binding.run {
 
-            btnRecordVideo.visibility = View.INVISIBLE
-            btnRecordVideo.setOnClickListener {
-                try {
-                    val state = recordingManager?.recordButtonClicked() ?: run {
-                        Log.e(TAG, "btnRecordVideo.onClick: RecordingManager is null!")
-                        return@setOnClickListener
+        // wait until views are all set up otherwise viewFinder.display may be null
+        viewFinder.post {
+            Log.d(TAG, "onStart: initializing camera")
+            initCamera()
+        }
+        displayManager =
+            requireContext().getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        btnToggleCamera.setOnClickListener { toggleCamera() }
+
+        btnRecordVideo.visibility = View.INVISIBLE
+        btnRecordVideo.setOnClickListener {
+            try {
+                val state = recordingManager?.recordButtonClicked() ?: run {
+                    Log.e(TAG, "btnRecordVideo.onClick: RecordingManager is null!")
+                    return@setOnClickListener
+                }
+                when (state) {
+                    RecordingManager.State.NOT_RECORDING -> {
+                        btnRecordVideo.visibility = View.INVISIBLE
+                        btnRecordVideo.setImageResource(R.drawable.ic_record_video)
+                        uiMode = UiState.NOT_RECORDING
                     }
-                    when (state) {
-                        RecordingManager.State.NOT_RECORDING -> {
-                            btnRecordVideo.visibility = View.INVISIBLE
-                            btnRecordVideo.setImageResource(R.drawable.ic_record_video)
-                            uiMode = UiState.NOT_RECORDING
-                        }
-                        RecordingManager.State.RECORDING -> {
-                            btnRecordVideo.visibility = View.VISIBLE
-                            btnRecordVideo.setImageResource(R.drawable.ic_stop_video)
-                            uiMode = UiState.RECORDING
-                        }
+                    RecordingManager.State.RECORDING -> {
+                        btnRecordVideo.visibility = View.VISIBLE
+                        btnRecordVideo.setImageResource(R.drawable.ic_stop_video)
+                        uiMode = UiState.RECORDING
                     }
                 }
-                catch (e: EncryptionException) {
-                    Toast.makeText(requireContext(), getString(R.string.error_encrypting), Toast.LENGTH_LONG).show()
-                }
+            } catch (e: EncryptionException) {
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.error_encrypting),
+                    Toast.LENGTH_LONG
+                ).show()
             }
-            btnSettings.setOnClickListener {
-                Navigation.findNavController(root)
-                    .navigate(R.id.action_cameraFragment_to_settingsFragment)
-            }
-            uiMode = UiState.NOT_RECORDING
-            btnFlash.setOnClickListener {
-                toggleFlash()
-            }
-            setFlashMode(flashMode)
+        }
+        btnSettings.setOnClickListener {
+            Navigation.findNavController(root)
+                .navigate(R.id.action_cameraFragment_to_settingsFragment)
+        }
+        uiMode = UiState.NOT_RECORDING
+        btnFlash.setOnClickListener {
+            toggleFlash()
+        }
+        setFlashMode(flashMode)
 
-            if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
-                lifecycleScope.launch {
-                    while (true) {
-                        overlayText.visibility = when (overlayText.visibility) {
-                            View.VISIBLE -> View.INVISIBLE
-                            else ->  View.VISIBLE
-                        }
-                        delay(1000)
+        if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
+            lifecycleScope.launch {
+                while (true) {
+                    overlayText.visibility = when (overlayText.visibility) {
+                        View.VISIBLE -> View.INVISIBLE
+                        else -> View.VISIBLE
                     }
+                    delay(1000)
                 }
             }
-            else {
-                overlayText.visibility = View.GONE
-            }
+        } else {
+            overlayText.visibility = View.GONE
         }
     }
 
