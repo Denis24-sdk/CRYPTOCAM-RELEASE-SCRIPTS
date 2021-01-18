@@ -16,31 +16,24 @@
 
 package androidx.camera.camera2;
 
+import android.annotation.SuppressLint;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
 import androidx.camera.camera2.internal.Camera2CameraFactory;
 import androidx.camera.camera2.internal.Camera2DeviceSurfaceManager;
-import androidx.camera.camera2.internal.ImageAnalysisConfigProvider;
-import androidx.camera.camera2.internal.ImageCaptureConfigProvider;
-import androidx.camera.camera2.internal.PreviewConfigProvider;
-import androidx.camera.camera2.internal.VideoCaptureConfigProvider;
-import androidx.camera.camera2.internal.VideoStreamCaptureConfigProvider;
+import androidx.camera.camera2.internal.Camera2UseCaseConfigFactory;
 import androidx.camera.core.CameraUnavailableException;
 import androidx.camera.core.CameraXConfig;
 import androidx.camera.core.InitializationException;
 import androidx.camera.core.impl.CameraDeviceSurfaceManager;
 import androidx.camera.core.impl.CameraFactory;
-import androidx.camera.core.impl.ExtendableUseCaseConfigFactory;
-import androidx.camera.core.impl.ImageAnalysisConfig;
-import androidx.camera.core.impl.ImageCaptureConfig;
-import androidx.camera.core.impl.PreviewConfig;
 import androidx.camera.core.impl.UseCaseConfigFactory;
-import androidx.camera.core.impl.VideoCaptureConfig;
-import androidx.camera.core.impl.VideoStreamCaptureConfig;
 
 /**
  * Convenience class for generating a pre-populated Camera2 {@link CameraXConfig}.
  */
+@SuppressLint("RestrictedApi")
 public final class MyCamera2Config {
 
     private MyCamera2Config() {
@@ -56,36 +49,21 @@ public final class MyCamera2Config {
         CameraFactory.Provider cameraFactoryProvider = Camera2CameraFactory::new;
 
         // Create the DeviceSurfaceManager for Camera2
-        CameraDeviceSurfaceManager.Provider surfaceManagerProvider = (context, cameraManager) -> {
+        CameraDeviceSurfaceManager.Provider surfaceManagerProvider = (context, cameraManager, availableCameraIds) -> {
             try {
-                return new Camera2DeviceSurfaceManager(context, cameraManager);
+                return new Camera2DeviceSurfaceManager(context, cameraManager, availableCameraIds);
             } catch (CameraUnavailableException e) {
                 throw new InitializationException(e);
             }
         };
-
         // Create default configuration factory
-        UseCaseConfigFactory.Provider configFactoryProvider = context -> {
-            ExtendableUseCaseConfigFactory factory = new ExtendableUseCaseConfigFactory();
-            factory.installDefaultProvider(
-                    ImageAnalysisConfig.class, new ImageAnalysisConfigProvider(context));
-            factory.installDefaultProvider(
-                    ImageCaptureConfig.class, new ImageCaptureConfigProvider(context));
-            factory.installDefaultProvider(
-                    VideoCaptureConfig.class, new VideoCaptureConfigProvider(context));
-            factory.installDefaultProvider(
-                    VideoStreamCaptureConfig.class, new VideoStreamCaptureConfigProvider(context));
-            factory.installDefaultProvider(
-                    PreviewConfig.class, new PreviewConfigProvider(context));
-            return factory;
-        };
-
+        UseCaseConfigFactory.Provider configFactoryProvider =
+                context -> new Camera2UseCaseConfigFactory(context);
         CameraXConfig.Builder appConfigBuilder =
                 new CameraXConfig.Builder()
                         .setCameraFactoryProvider(cameraFactoryProvider)
                         .setDeviceSurfaceManagerProvider(surfaceManagerProvider)
                         .setUseCaseConfigFactoryProvider(configFactoryProvider);
-
         return appConfigBuilder.build();
     }
 

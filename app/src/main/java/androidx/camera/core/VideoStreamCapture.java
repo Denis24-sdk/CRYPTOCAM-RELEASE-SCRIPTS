@@ -52,7 +52,6 @@ import androidx.camera.core.impl.UseCaseConfigFactory;
 import androidx.camera.core.impl.VideoStreamCaptureConfig;
 import androidx.camera.core.impl.utils.executor.CameraXExecutors;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -198,10 +197,14 @@ public class VideoStreamCapture extends UseCase {
         return format;
     }
 
-    @Nullable
     @Override
-    public UseCaseConfig<?> getDefaultConfig(@NonNull UseCaseConfigFactory factory) {
-        Config captureConfig = factory.getConfig(VideoStreamCaptureConfig.class);
+    @Nullable
+    public UseCaseConfig<?> getDefaultConfig(boolean applyDefaultConfig,
+                                             @NonNull UseCaseConfigFactory factory) {
+        Config captureConfig = factory.getConfig(UseCaseConfigFactory.CaptureType.VIDEO_CAPTURE);
+        if (applyDefaultConfig) {
+            captureConfig = Config.mergeConfigs(captureConfig, DEFAULT_CONFIG.getConfig());
+        }
         return captureConfig == null ? null :
                 getUseCaseConfigBuilder(captureConfig).getUseCaseConfig();
     }
@@ -210,12 +213,6 @@ public class VideoStreamCapture extends UseCase {
     @Override
     public UseCaseConfig.Builder<?, ?, ?> getUseCaseConfigBuilder(@NonNull Config config) {
         return VideoStreamCaptureConfig.Builder.fromConfig(config);
-    }
-
-    @NonNull
-    @Override
-    public UseCaseConfig.Builder<?, ?, ?> getUseCaseConfigBuilder() {
-        return VideoStreamCaptureConfig.Builder.fromConfig(getCurrentConfig());
     }
 
     /**
@@ -350,10 +347,7 @@ public class VideoStreamCapture extends UseCase {
      * Stops recording video, this must be called after {@link
      * VideoStreamCapture#startRecording(Executor, OnVideoSavedCallback)} is called.
      *
-     * <p>stopRecording() is asynchronous API. User need to check if {@link
-     * OnVideoSavedCallback1#onVideoSaved(File)} or
-     * {@link OnVideoSavedCallback#onError(int, String, Throwable)} be called
-     * before startRecording.
+     * <p>stopRecording() is asynchronous API.
      */
     public void stopRecording() {
         Log.i(TAG, "stopRecording");
