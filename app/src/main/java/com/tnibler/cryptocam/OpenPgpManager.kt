@@ -63,12 +63,13 @@ class OpenPgpManager {
         }
     }
 
-    fun checkKeyIdIsValid(keyId: Long): Boolean {
-        val data = Intent().apply {
+    fun checkKeyIdIsValid(keyId: Long, intent: Intent = Intent()): Boolean {
+        val data = intent.apply {
             action = OpenPgpApi.ACTION_ENCRYPT
         }
         data.putExtra(OpenPgpApi.EXTRA_KEY_IDS, longArrayOf(keyId))
-        val result = api.executeApi(data, ByteArrayInputStream(byteArrayOf()), ByteArrayOutputStream())
+        val result =
+            api.executeApi(data, ByteArrayInputStream(byteArrayOf()), ByteArrayOutputStream())
         return when (result.getIntExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_ERROR)) {
             OpenPgpApi.RESULT_CODE_ERROR -> {
                 false
@@ -78,7 +79,7 @@ class OpenPgpManager {
             }
             OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED -> {
                 Log.w(TAG, "user interaction required")
-                false
+                return checkKeyIdIsValid(keyId, intent)
             }
             else -> false
         }
