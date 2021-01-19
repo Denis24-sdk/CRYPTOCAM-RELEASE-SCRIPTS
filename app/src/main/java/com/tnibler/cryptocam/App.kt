@@ -7,9 +7,7 @@ import org.openintents.openpgp.util.OpenPgpServiceConnection
 class App : Application() {
     var openPgpServiceConnection: OpenPgpServiceConnection? = null
     var openPgpApi: OpenPgpApi? = null
-    override fun onCreate() {
-        super.onCreate()
-    }
+    var startedRecordingOnLaunch = false
 
     override fun onTerminate() {
         super.onTerminate()

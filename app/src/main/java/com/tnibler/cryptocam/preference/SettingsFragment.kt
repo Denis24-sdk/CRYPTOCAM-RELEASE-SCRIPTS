@@ -121,7 +121,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         screen.addPreference(resolutionPreference)
-        resolutionPreference.summary = getString(R.string.video_resolution_summary, resolutionPreference.value as String)
+        resolutionPreference.summary =
+            getString(R.string.video_resolution_summary, resolutionPreference.value as String)
 
         val overlayPreference = CheckBoxPreference(context)
         overlayPreference.setDefaultValue(false)
@@ -130,6 +131,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         overlayPreference.summary = getString(R.string.enable_overlay_summary)
 
         screen.addPreference(overlayPreference)
+
+        val recordOnStartPreference = CheckBoxPreference(context)
+        recordOnStartPreference.setDefaultValue(false)
+        recordOnStartPreference.key = PREF_RECORD_ON_START
+        recordOnStartPreference.title = getString(R.string.record_on_start)
+        recordOnStartPreference.summary = getString(R.string.record_on_start_summary)
+
+        screen.addPreference(recordOnStartPreference)
 
         preferenceScreen = screen
     }
@@ -141,6 +150,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_FRAMERATE = "videoFramerate"
         const val PREF_VIDEO_RESOLUTION = "videoResolution"
         const val PREF_OVERLAY = "enableOverlay"
+        const val PREF_RECORD_ON_START = "recordOnStart"
 
         const val DEFAULT_RESOLUTION = "1920x1080"
     }

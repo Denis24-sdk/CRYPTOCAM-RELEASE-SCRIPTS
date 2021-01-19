@@ -124,7 +124,7 @@ class CameraFragment : Fragment() {
                         uiMode = UiState.RECORDING
                     }
                 }
-            } catch (e: EncryptionException) {
+            } catch (e: EncryptionException) { // FIXME this is never caught because the RecordingManager.setupMuxer called from a coroutine
                 Toast.makeText(
                     requireContext(),
                     getString(R.string.error_encrypting),
@@ -279,9 +279,22 @@ class CameraFragment : Fragment() {
         val actualRes = videoCapture.attachedSurfaceResolution ?: throw RuntimeException()
 //        Toast.makeText(requireContext(), getString(R.string.actual_recording_resolution, actualRes), Toast.LENGTH_LONG).show()
         Log.d(TAG, "actual resolution: $actualRes")
-        val onReadyToRecord = {
+        val onReadyToRecord: () -> Unit = {
             Log.d(TAG, "onReadyToRecord")
             binding.btnRecordVideo.visibility = View.VISIBLE
+            Handler().post {
+                Thread.sleep(100)
+                val app = (requireContext().applicationContext as App)
+                if (!app.startedRecordingOnLaunch && sharedPreferences.getBoolean(
+                        SettingsFragment.PREF_RECORD_ON_START,
+                        false
+                    )
+                ) {
+                    Log.d(TAG, "Automatically recording")
+                    app.startedRecordingOnLaunch = true
+                    binding.btnRecordVideo.callOnClick()
+                }
+            }
         }
         val width = if (lastHandledOrientation == Orientation.PORTRAIT) actualRes.height else actualRes.width
         val height = if (lastHandledOrientation == Orientation.PORTRAIT) actualRes.width else actualRes.height
@@ -409,10 +422,6 @@ class CameraFragment : Fragment() {
         orientationEventListener =
             object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
                 override fun onOrientationChanged(orientation: Int) {
-                    Log.d(
-                        TAG,
-                        "onOrientationChanged, orientation=$orientation, recordingManager==$recordingManager"
-                    )
                     val currentOrientation = when (orientation) {
                         in 75..134 -> Orientation.LAND_RIGHT
                         in 224..289 -> Orientation.LAND_LEFT

@@ -30,4 +30,6 @@
     <string name="actual_recording_resolution">Actual recording resolution: %s</string>
     <string name="enable_overlay">Enable overlay</string>
     <string name="enable_overlay_summary">Let others around you know that your recordings are safely encrypted</string>
+    <string name="record_on_start">Automatically start recording</string>
+    <string name="record_on_start_summary">Video recording will start as soon as the app opens.</string>
 </resources>
