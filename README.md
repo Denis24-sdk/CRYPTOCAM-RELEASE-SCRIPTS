@@ -28,6 +28,7 @@ Not all configurations are supported by all devices, so if you choose one that y
 
 So far, these devices have been tested:
 
+ - Samsung Galaxy S9: up to 1920x1080 at 60fps. No 4K 
  - Google Pixel 2XL: up to 1920x1080 at 60fps. No 4K
  - LG G6: up to 1920x1080 at 60fps. No 4K
  
