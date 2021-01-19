@@ -3,16 +3,12 @@ package com.tnibler.cryptocam
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import android.widget.Toast
 import androidx.camera.core.EncodedBufferHandler
 import androidx.camera.core.VideoStreamCapture
 import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.time.Duration
-import java.time.temporal.Temporal
-import java.time.temporal.TemporalUnit
 import java.util.concurrent.Executor
 
 class RecordingManager(
@@ -35,7 +31,9 @@ class RecordingManager(
     private var recordingStartMillis: Long = 0
 
     init {
-        setUpMuxer()
+        coroutineScope.launch {
+            setUpMuxer()
+        }
     }
 
     private fun setUpMuxer() {
