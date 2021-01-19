@@ -17,6 +17,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.IdRes
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
 import androidx.navigation.NavController
 import androidx.navigation.Navigation
@@ -109,18 +110,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun keyExists(): Boolean {
         try {
-            val savedKey =
+            val savedKeys =
                 sharedPreferences.getStringSet(SettingsFragment.PREF_OPENPGP_KEYIDS, setOf())
                     ?.map { it.toLong() } ?: return false
-            if (savedKey.isEmpty()) {
+            if (savedKeys.isEmpty()) {
                 return false
             }
-            return true
+            val validKeys = savedKeys.filter { keyId -> openPgpKeyManager.checkKeyIdIsValid(keyId) }
+            sharedPreferences.edit(commit = true) {
+                putStringSet(
+                    SettingsFragment.PREF_OPENPGP_KEYIDS,
+                    validKeys.map { it.toString() }.toSet()
+                )
+            }
+            return validKeys.isNotEmpty()
         }
         catch (e: Exception) {
             return false
         }
-//        return openPgpKeyManager.checkKeyIdIsValid(savedKey)
     }
 
     private fun outputDirExists(): Boolean {
@@ -128,11 +135,10 @@ class MainActivity : AppCompatActivity() {
             val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
                 ?: return false
             val df = DocumentFile.fromTreeUri(this, Uri.parse(savedUri)) ?: return false
-            df.listFiles()
+            return df.exists()
         } catch (e: Exception) {
             return false
         }
-        return true
     }
 
     val openPGPUserInteractionActivityResult =
