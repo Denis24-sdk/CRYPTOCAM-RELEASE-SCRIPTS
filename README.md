@@ -51,6 +51,16 @@ Transfer the directory where videos are saved to your PC and `cd` to the locatio
 Before building the app, `ffmpeg` needs to be downloaded and compiled. A complete build can be run with `./complete_build.sh`.
 Subsequent builds can be run through Android Studio or Gradle.
 
+## Roadmap
+
+Planned:
+ - extensive documentation and tutorials how to use this
+ - Graphical tool to decrypt videos on desktop
+ - In the app:
+   - Ability to record in the background
+   - Photo mode
+   - Decrypt videos on device for testing purposes
+
 ## Contributing
 
 Please test it on your available devices and share the results. Create an issue or send me an email at cryptocam@tnibler.de to explain what is and what is not working.
