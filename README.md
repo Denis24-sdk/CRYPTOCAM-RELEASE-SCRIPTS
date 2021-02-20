@@ -36,15 +36,7 @@ Please share your results on your device as well!
 
 ## Decrypting videos
 
-Decrypting has only been tested on Linux. It probably works on MacOS as well though.
-
-Clone [the companion script](https://gitlab.com/tnibler/cryptocam-companion) and follow the instructions in README.md.
-
-Transfer the directory where videos are saved to your PC and `cd` to the location where you cloned the companion script. Then run:
-
-```
- ./decrypt.sh /path/to/my/cryptocam/videos/* --destination /desired/destination
-```
+Decryption can be done on the computer using a script [like this one](https://gist.github.com/m-rey/3d64b393936fb64360052ee7ee8c61d6) or the graphical [Companion App](https://gitlab.com/tnibler/cryptocam-companion) which also allows creating and managing GPG keys without using any CLI.
 
 ## Building
 
