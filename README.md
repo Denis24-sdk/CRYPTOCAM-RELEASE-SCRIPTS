@@ -46,8 +46,8 @@ Subsequent builds can be run through Android Studio or Gradle.
 ## Roadmap
 
 Planned:
- - extensive documentation and tutorials how to use this
- - Graphical tool to decrypt videos on desktop
+ - extensive documentation and tutorials how to use this (NEXT UP)
+ - ~~Graphical tool to decrypt videos on desktop~~ (DONE)
  - In the app:
    - Ability to record in the background
    - Photo mode
