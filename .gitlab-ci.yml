@@ -1,0 +1,52 @@
+# this image uses ubuntu 18.04 which doesn't have python3.9 or newer QML packages.
+# I've tried just doing the steps from the appimage-builder Dockerfile in here, but
+# that breaks the appimage-builder build for some reason (even though it works in a
+# Dockerfile with newer Ubuntu). That's why we're doing the python backport ppa stuff here.
+stages:
+    - build
+    - release
+build_appimage_amd64:
+    stage: build
+    only:
+        - /^v[0-9][0-9\.]*[a-zA-Z\-]*$/i
+    except:
+        - branches
+
+    image: appimagecrafters/appimage-builder:latest
+
+    before_script:
+        - apt-get install -y software-properties-common
+        - add-apt-repository ppa:deadsnakes/ppa
+        - apt-get update
+        - DEBIAN_FRONTEND=noninteractive apt-get -y install jq python3.9 python3.9-distutils
+        # - DEBIAN_FRONTEND=noninteractive apt-get -y install python3.9-setuptools python3.9-pip pipenv wget fakeroot gnupg2 libglib2.0-bin file desktop-file-utils libgdk-pixbuf2.0-dev librsvg2-dev libyaml-dev zsync git jq
+
+    script:
+        - cd $CI_PROJECT_DIR
+        - jq --raw-output '.default | to_entries[] | .key + .value.version + (.value.hashes | map(" --hash=\(.)") | join(""))' Pipfile.lock > requirements.txt
+        - appimage-builder --skip-tests
+        - export APPIMAGE_NAME=$(find *.AppImage)
+
+        - echo "APPIMAGE_LINK=https://gitlab.com/tnibler/cryptocam-companion/-/jobs/$CI_JOB_ID/artifacts/raw/$APPIMAGE_NAME?inline=false" >> build.env
+    artifacts:
+        reports:
+            dotenv: build.env
+        paths:
+            - '*.AppImage'
+        expire_in: 30 days
+
+release:
+    stage: release
+    only:
+        - /^v[0-9][0-9\.]*$/i
+    except:
+        - branches
+    image: registry.gitlab.com/gitlab-org/release-cli:latest
+
+    needs:
+        - job: build_appimage_amd64
+          artifacts: true
+    script:
+        - |
+          release-cli create --name "Release $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+            --assets-link "{\"name\":\"Linux AppImage\",\"url\":\"$APPIMAGE_LINK\"}"
