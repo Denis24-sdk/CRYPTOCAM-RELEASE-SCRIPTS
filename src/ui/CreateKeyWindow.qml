@@ -27,6 +27,7 @@ ApplicationWindow {
         TextField {
             id: textFieldName
             Layout.fillWidth: true
+            selectByMouse: true
         }
 
         Label {
@@ -38,6 +39,7 @@ ApplicationWindow {
             id: textFieldEmail
             Layout.fillWidth: true
             text: "email@email.com"
+            selectByMouse: true
         }
 
         Label {
@@ -48,6 +50,7 @@ ApplicationWindow {
         TextField {
             id: textFieldComment
             Layout.fillWidth: true
+            selectByMouse: true
         }
 
         Label {
