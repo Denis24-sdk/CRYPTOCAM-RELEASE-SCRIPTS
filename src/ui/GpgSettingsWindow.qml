@@ -3,7 +3,7 @@ import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Dialogs 1.2
-import Qt.labs.platform 1.1 as PlatformDialog
+import Qt.labs.platform 1.1 as Platform
 
 import Key 1.0
 import GpgSettingsController 1.0
@@ -140,9 +140,14 @@ ApplicationWindow {
                 onClicked: {
                     let index = listKeyView.currentIndex
                     let currentKeyItem = gpgKeyListModel.get(index)
+
                     let filename = currentKeyItem.exportName + ".priv"
                     passphraseExportDialog.fingerprint = currentKeyItem.fingerprint
-                    exportPrivateDialog.currentFile = filename
+                    exportPrivateDialog.folder = Platform.StandardPaths.writableLocation(Platform.StandardPaths.HomeLocation)
+                    // this prepends strange paths to the filename in the AppImage making it confusing for users.
+                    // putting file:// before the name fixes that problem, but then the name is only set
+                    // some of the time, which is even more confusing so just leave it blank
+//                    exportPrivateDialog.currentFile = filename
                     exportPrivateDialog.visible = true
                 }
             }
@@ -154,15 +159,17 @@ ApplicationWindow {
                 onClicked: {
                     let index = listKeyView.currentIndex
                     let currentKeyItem = gpgKeyListModel.get(index)
+
                     let filename = currentKeyItem.exportName + ".pub"
-                    exportPublicDialog.currentFile = filename
+                    exportPublicDialog.folder = Platform.StandardPaths.writableLocation(Platform.StandardPaths.HomeLocation)
+//                    exportPublicDialog.currentFile = filename
                     exportPublicDialog.visible = true
                 }
             }
         }
     }
 
-    PlatformDialog.FolderDialog {
+    Platform.FolderDialog {
         id: gpgHomeDialog
         title: "Please choose a folder"
         onAccepted: {
@@ -171,11 +178,11 @@ ApplicationWindow {
         modality: "ApplicationModal"
     }
 
-    PlatformDialog.FileDialog {
+    Platform.FileDialog {
         id: exportPublicDialog
         title: "Export public key"
         modality: "ApplicationModal"
-        fileMode: PlatformDialog.FileDialog.SaveFile
+        fileMode: Platform.FileDialog.SaveFile
         defaultSuffix: ".pub"
         onAccepted: {
             let fingerprint = gpgKeyListModel.get(listKeyView.currentIndex).fingerprint
@@ -183,22 +190,22 @@ ApplicationWindow {
         }
     }
 
-    PlatformDialog.FileDialog {
+    Platform.FileDialog {
         id: exportPrivateDialog
         title: "Export private key"
         modality: "ApplicationModal"
-        fileMode: PlatformDialog.FileDialog.SaveFile
+        fileMode: Platform.FileDialog.SaveFile
         defaultSuffix: ".priv"
         onAccepted: {
             passphraseExportDialog.visible = true
         }
     }
 
-    PlatformDialog.FileDialog {
+    Platform.FileDialog {
         id: importKeyDialog
         title: "Import key"
         modality: "ApplicationModal"
-        fileMode: PlatformDialog.FileDialog.OpenFile
+        fileMode: Platform.FileDialog.OpenFile
         onAccepted: {
                     let file = importKeyDialog.file
                     gpgSettingsWindow.onImportKeys(file)
