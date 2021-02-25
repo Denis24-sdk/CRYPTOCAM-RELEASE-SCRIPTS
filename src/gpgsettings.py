@@ -75,7 +75,6 @@ class GpgSettingsController(QObject):
 
     @pyqtSlot("QVariant")
     def init(self, gpg_provider):
-        print('asdasd')
         self.gpg_provider = gpg_provider
         self.gpgHomePathChanged.emit(self.gpg_provider.gpg.gnupghome)
         self.__keys.clear()
