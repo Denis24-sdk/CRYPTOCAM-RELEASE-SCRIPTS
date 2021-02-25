@@ -93,16 +93,16 @@ ApplicationWindow {
                             }
                         }
 
-                        ToolButton {
+                        Button {
                             id: buttonRemoveFile
                             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                             Layout.leftMargin: 8
-                            icon.name: getIcon()
-                            function getIcon() {
+                            text: getText()
+                            function getText() {
                                 if (processingState === "NotStarted")
-                                    return 'edit-delete'
+                                    return "Remove"
                                 else if (processingState === "Processing")
-                                    return 'process-stop'
+                                    return "Cancel"
                                 return null
                             }
                             visible: [ "NotStarted", "Processing" ].includes(processingState)
