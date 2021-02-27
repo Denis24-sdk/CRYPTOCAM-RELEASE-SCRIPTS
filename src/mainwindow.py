@@ -1,4 +1,5 @@
 import asyncio
+import queue
 import os
 import re
 import signal
@@ -14,8 +15,7 @@ from decrypt import create_ffmpeg
 from file_list import *
 from gpgsettings import GpgProvider
 
-WINDOW_HEIGHT = 900
-WINDOW_WIDTH = 800
+MAX_FFMPEG_JOBS = 3
 
 
 class MainWindowController(QObject):
@@ -29,13 +29,11 @@ class MainWindowController(QObject):
     decrypt_tasks = {}
     ffmpeg_outputs = {}
     output_path = './'
+    ffmpeg_queue: queue.Queue = queue.Queue()
+    running_ffmpegs = 0
 
     def __init__(self, gpg_provider):
         super().__init__()
-        # self.setTitle('Cryptocam Companion')
-        # self.setWidth(WINDOW_WIDTH)
-        # self.setHeight(WINDOW_HEIGHT)
-        # self.show()
         self.gpg_provider = gpg_provider
         self.outputPathChanged.emit(self.output_path)
 
@@ -95,19 +93,19 @@ class MainWindowController(QObject):
                                        item),
                                    output_callback=lambda o, item=item: self.__on_ffmpeg_output(item,
                                                                                                 o),
-                                   error_callback=lambda e, item=item: self.__on_decrypt_error(item, e))
+                                   gpg_error_callback=lambda e, item=item: self.__on_gpg_error(
+                                       item, e),
+                                   ffmpeg_error_callback=lambda e, item=item:
+                                   self.__on_ffmpeg_error(item, e))
             if ffmpeg is not None:
                 self.decrypt_tasks[item] = ffmpeg
-                asyncio.ensure_future(
-                    ffmpeg.execute(), loop=asyncio.get_event_loop())
+                self.ffmpeg_queue.put(ffmpeg)
+        self.__launch_ffmpegs_if_available()
 
-    @pyqtSlot()
+    @ pyqtSlot()
     def onGpgSettingsClicked(self):
         pass
         # self.gpgWindow = GpgSettingsWindow(self.gpg_provider)
-
-    async def __queue_task(self, task):
-        await self.__queue.put(task)
 
     __ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
@@ -125,7 +123,7 @@ class MainWindowController(QObject):
             FileListItem.State.Processing, progress=f'{progress.frame} frames')
         self.listItemsChanged.emit(self.file_list_items)
 
-    def __on_decrypt_error(self, file_item, error):
+    def __on_gpg_error(self, file_item, error):
         print(
             f'error for {file_item.file_and_keyfile_paths.file_path}: {error}')
         file_item.update_state(FileListItem.State.Error,
@@ -136,10 +134,25 @@ class MainWindowController(QObject):
         if file_item == self.selected_item:
             self.statusTextChanged.emit(self.ffmpeg_outputs[file_item])
 
+    def __on_ffmpeg_error(self, file_item, error):
+        print(
+            f'error for {file_item.file_and_keyfile_paths.file_path}: {error}')
+        file_item.update_state(FileListItem.State.Error,
+                               error_message=str(error))
+        self.listItemsChanged.emit(self.file_list_items)
+        self.ffmpeg_outputs[file_item] = self.ffmpeg_outputs.get(
+            file_item, '') + '\n' + f'<font color=#ff0000>{error}</font>'
+        if file_item == self.selected_item:
+            self.statusTextChanged.emit(self.ffmpeg_outputs[file_item])
+
+        self.running_ffmpegs -= 1
+
     def __on_decrypt_complete(self, file_item):
         file_item.update_state(FileListItem.State.Done)
         self.listItemsChanged.emit(self.file_list_items)
         del self.decrypt_tasks[file_item]
+        self.running_ffmpegs -= 1
+        self.__launch_ffmpegs_if_available()
 
     def event(self, event):
         if (event.type() == QEvent.Close):
@@ -149,7 +162,18 @@ class MainWindowController(QObject):
                 ffmpeg.terminate()
         return super().event(event)
 
-    @pyqtSlot(int)
+    def __launch_ffmpegs_if_available(self):
+        print(f'running jobs: {self.running_ffmpegs}')
+        while self.running_ffmpegs < MAX_FFMPEG_JOBS and not self.ffmpeg_queue.empty():
+            try:
+                ffmpeg = self.ffmpeg_queue.get_nowait()
+            except QueueEmpty as e:
+                continue  # shouldn't really happen
+            asyncio.ensure_future(
+                ffmpeg.execute(), loop=asyncio.get_event_loop())
+            self.running_ffmpegs += 1
+
+    @ pyqtSlot(int)
     def onItemRemoved(self, index):
         item = self.file_list_items[index]
         if item.processingState == FileListItem.State.NotStarted:
@@ -161,10 +185,12 @@ class MainWindowController(QObject):
             if item in self.decrypt_tasks:
                 self.decrypt_tasks[item].terminate()
                 del self.decrypt_tasks[item]
+                self.running_ffmpegs -= 1
+                self.__launch_ffmpegs_if_available()
             item.update_state(FileListItem.State.Canceled)
             self.listItemsChanged.emit(self.file_list_items)
 
-    @pyqtSlot(int)
+    @ pyqtSlot(int)
     def onItemSelected(self, index):
         item = self.file_list_items[index]
         self.selected_item = item
