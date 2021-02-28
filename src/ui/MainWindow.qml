@@ -118,6 +118,7 @@ ApplicationWindow {
                         color: 'grey'
                     }
                 }
+                highlightMoveDuration: 1 // this is an obnoxious animation
                 highlight: Rectangle { color: "lightsteelblue"; }
             }
         }
