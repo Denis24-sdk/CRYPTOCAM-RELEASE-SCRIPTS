@@ -32,5 +32,5 @@ def create_ffmpeg(file_and_keyfile_path, dest_path, gpg, progress_callback,
             ffmpeg.on('stderr', output_callback)
             return ffmpeg
         except (FileNotFoundError, IOError, JSONDecodeError) as e:
-            ffmpeg_error_callback(e)
+            gpg_error_callback(e)
             return None
