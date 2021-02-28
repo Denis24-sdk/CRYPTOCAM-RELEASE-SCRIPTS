@@ -15,7 +15,7 @@ from decrypt import create_ffmpeg
 from file_list import *
 from gpgsettings import GpgProvider
 
-MAX_FFMPEG_JOBS = 3
+MAX_FFMPEG_JOBS = 6
 
 
 class MainWindowController(QObject):
