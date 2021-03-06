@@ -1,5 +1,7 @@
 # Cryptocam Companion App
 
+## [Full Cryptocam how-to here](https://cryptocam.gitlab.io/)
+
 This tool is a Graphical interface to decrypt videos taken by [Cryptocam](https://gitlab.com/tnibler/cryptocam) as well as managing GPG keys without using the CLI.
 
 This is designed to be usable for people who are not used to the CLI and have never used GPG before.
