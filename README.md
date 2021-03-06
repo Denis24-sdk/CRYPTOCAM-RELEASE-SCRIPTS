@@ -15,6 +15,8 @@ Using OpenPGP with only the public key(s) stored on the device means that record
 
 ## How to use it
 
+## [Full Cryptocam how-to here](https://cryptocam.gitlab.io/)
+
 Setup:
 
  - Install OpenKeychain onto your device
