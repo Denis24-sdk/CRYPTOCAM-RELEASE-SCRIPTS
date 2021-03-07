@@ -32,6 +32,7 @@ class VideoMuxer {
     bool writtenVideo;
     bool writtenAudio;
     int firstVideoPts;
+    int firstAudioPts;
 public:
     VideoMuxer();
     int init(int fd, VideoInfo info, AudioInfo audioInfo, const char key[16]);

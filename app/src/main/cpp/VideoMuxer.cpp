@@ -34,6 +34,7 @@ int VideoMuxer::init(int fd, VideoInfo videoInfo, AudioInfo audioInfo, const cha
     }
     outputContext->pb = customAvioContext.getAVIOContext();
     outputContext->oformat = format;
+    outputContext->oformat->flags |= AVFMT_SEEK_TO_PTS;
 
 
     /* Set up video stream */
@@ -86,34 +87,33 @@ int VideoMuxer::writeVideoFrame(uint8_t *data, int size, int64_t presentationTim
         LOGD("Not writing frame");
         return 1;
     }
+    bool isIframe = false;
+    if (data[4] == 0x65) {
+        isIframe = true;
+    }
+
     AVPacket pkt;
     av_init_packet(&pkt);
-//    LOGD("Initialized packet of size %d", size);
-    pkt.flags |= AV_PKT_FLAG_KEY; // TODO needed?
     pkt.data = data;
     pkt.size = size;
-    // maybe check if we're waiting for keyframe
-//    pkt.dts = AV_NOPTS_VALUE;
     pkt.pts = presentationTimeUs;
     if (writtenVideo) {
         pkt.pts -= firstVideoPts;
     }
-    av_packet_rescale_ts(&pkt, AVRational { 1, 1000000}, outputContext->streams[videoStreamIndex]->time_base);
+    av_packet_rescale_ts(&pkt, AVRational{1, 1000000},
+                         outputContext->streams[videoStreamIndex]->time_base);
     pkt.dts = AV_NOPTS_VALUE;
     pkt.stream_index = videoStreamIndex;
-    if (!writtenVideo) {
-        AVStream* videoStream = outputContext->streams[videoStreamIndex];
-        LOGD("Writing first video packet: pts = %lld. Video time base %d/%d", pkt.pts, videoStream->time_base.num, videoStream->time_base.den);
-        videoStream->start_time = pkt.pts;
+    if (!writtenVideo && isIframe) {
         firstVideoPts = presentationTimeUs;
     }
-//    LOGD("Writing frame.");
     if (av_interleaved_write_frame(outputContext, &pkt) < 0) {
         LOGE("Error writing frame");
         return 1;
     }
-//    LOGD("Finished writing frame");
-    writtenVideo = true;
+    if (!writtenVideo && isIframe) {
+        writtenVideo = true;
+    }
     return 0;
 }
 
@@ -131,18 +131,20 @@ int VideoMuxer::writeAudioFrame(uint8_t *data, int size, int64_t presentationTim
     pkt.size = size;
     pkt.stream_index = audioStreamIndex;
     pkt.pts = presentationTimeUs;
-    av_packet_rescale_ts(&pkt, AVRational { 1, 1000000}, outputContext->streams[audioStreamIndex]->time_base);
+    if (writtenAudio) {
+        pkt.pts -= firstAudioPts;
+    }
+    av_packet_rescale_ts(&pkt, AVRational{1, 1000000},
+                         outputContext->streams[audioStreamIndex]->time_base);
     pkt.flags |= AV_PKT_FLAG_KEY;
     pkt.dts = AV_NOPTS_VALUE;
     if (!writtenAudio) {
-        outputContext->streams[audioStreamIndex]->start_time = pkt.pts;
-        LOGD("Writing first audio packet: pts = %lld", pkt.pts);
+        firstAudioPts = presentationTimeUs;
     }
     if (av_interleaved_write_frame(outputContext, &pkt) < 0) {
         LOGE("Error writing audio frame");
         return 1;
     }
-//    LOGD("Finished writing audio frame");
     writtenAudio = true;
     return 0;
 }
