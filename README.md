@@ -48,17 +48,14 @@ Subsequent builds can be run through Android Studio or Gradle.
 ## Roadmap
 
 Planned:
- - extensive documentation and tutorials how to use this (NEXT UP)
- - ~~Graphical tool to decrypt videos on desktop~~ (DONE)
+ - [x] ~~extensive documentation and tutorials how to use this~~
+ - [x] ~~Graphical tool to decrypt videos on desktop~~
  - In the app:
-   - Ability to record in the background
-   - Photo mode
-   - Decrypt videos on device for testing purposes
+   - [] Ability to record in the background (IN PROGRESS)
+   - [] Photo mode
+   - ~~[] Decrypt videos on device for testing purposes~~ (Shelved for technical and security reasons)
 
 ## Contributing
 
-Please test it on your available devices and share the results. Create an issue or send me an email at cryptocam@tnibler.de to explain what is and what is not working.
-
-If you know your way around video and ffmpeg, please feel free to look at Cryptocam's implementation of video/audio muxing and improve it. It works, but video and audio are not in sync at times and I lack the expertise to fix it.
-
+Please test Cryptocam on your available devices and share the results. Create an issue or send me an email at cryptocam@tnibler.de to explain what is and what is not working.
 	
