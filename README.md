@@ -51,9 +51,9 @@ Planned:
  - [x] ~~extensive documentation and tutorials how to use this~~
  - [x] ~~Graphical tool to decrypt videos on desktop~~
  - In the app:
-   - [] Ability to record in the background (IN PROGRESS)
-   - [] Photo mode
-   - ~~[] Decrypt videos on device for testing purposes~~ (Shelved for technical and security reasons)
+   - Ability to record in the background (IN PROGRESS)
+   - Photo mode
+   - ~~Decrypt videos on device for testing purposes~~ (Shelved for technical and security reasons)
 
 ## Contributing
 
