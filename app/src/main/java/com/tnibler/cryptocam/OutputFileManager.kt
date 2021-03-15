@@ -1,27 +1,12 @@
 package com.tnibler.cryptocam
 
-import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.os.storage.StorageManager
-import android.provider.OpenableColumns
-import android.util.JsonWriter
 import android.util.Log
-import androidx.annotation.RequiresApi
-import androidx.core.content.ContentResolverCompat
 import androidx.documentfile.provider.DocumentFile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import org.json.JSONObject
-import java.lang.StringBuilder
 import java.math.BigInteger
-import java.nio.charset.Charset
-import java.text.DateFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -51,30 +36,11 @@ class OutputFileManager(private val openPgpManager: OpenPgpManager, var outputLo
 
         val outFile = out.createFile("video/mp4", "$filename.mp4") ?: throw RuntimeException("Error creating output file")
         val outFd = contentResolver.openFileDescriptor(outFile.uri, "rwt", null)?.detachFd() ?: throw RuntimeException("Error opening file descriptor")
-//        val outFile = context.externalMediaDirs.first().toPath().resolve("$filename.mp4").toFile()
         val file = EncryptedVideoFile(hexKey, outFd)
         currentFile = file
         currentFileName = filename
         Log.d(TAG, "new file: $filename")
-//        emit(file)
         return file
-    }
-
-    fun fileUsed() {
-        Log.d(TAG, "used: $currentFileName")
-        currentFile = null
-        currentFileName = null
-    }
-
-    fun fileNotUsed() {
-//        val out = DocumentFile.fromTreeUri(context, outputLocation) ?: throw RuntimeException("Error opening output directory")
-//        val cfn = currentFileName ?: return
-//        Log.d(TAG, "deleting: $cfn")
-//        out.listFiles().filter { f ->
-//            f.name?.startsWith(cfn) ?: false
-//        }.forEach { f ->
-//            f.delete()
-//        }
     }
 
     private val dateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME

@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
+import androidx.documentfile.provider.DocumentFile
 import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -33,21 +34,24 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val context = preferenceManager.context
         val screen = preferenceManager.createPreferenceScreen(context)
         rootKey?.let { screen.key = rootKey }
-
         val requestDirectory =
             registerForActivityResult(object : ActivityResultContracts.OpenDocumentTree() {
                 override fun createIntent(context: Context, input: Uri?): Intent {
                     return super.createIntent(context, input).apply {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+                    }
+                }
+            }) { uri ->
+                uri ?: return@registerForActivityResult
+                preferenceManager.sharedPreferences.edit {
+                    putString(PREF_OUTPUT_DIRECTORY, uri.toString())
+                    commit()
+                }
+                val dir = DocumentFile.fromTreeUri(requireContext(), uri)
+                if (dir?.findFile(".nomedia") == null) {
+                    dir?.createFile("asd/asd", ".nomedia")
                 }
             }
-        }) { uri ->
-            uri ?: return@registerForActivityResult
-            preferenceManager.sharedPreferences.edit {
-                putString(PREF_OUTPUT_DIRECTORY, uri.toString())
-                commit()
-            }
-        }
 
         val outputDirPreference = Preference(context)
         outputDirPreference.key =
@@ -140,6 +144,15 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         screen.addPreference(recordOnStartPreference)
 
+        val vibrateWhileRecordingPreference = CheckBoxPreference(context)
+        vibrateWhileRecordingPreference.setDefaultValue(true)
+        vibrateWhileRecordingPreference.key = PREF_VIBRATE_WHILE_RECORDING
+        vibrateWhileRecordingPreference.title = getString(R.string.vibrate_while_recording)
+        vibrateWhileRecordingPreference.summary =
+            getString(R.string.vibrate_while_recording_summary)
+
+        screen.addPreference(vibrateWhileRecordingPreference)
+
         preferenceScreen = screen
     }
 
@@ -151,6 +164,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_VIDEO_RESOLUTION = "videoResolution"
         const val PREF_OVERLAY = "enableOverlay"
         const val PREF_RECORD_ON_START = "recordOnStart"
+        const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
+
+        const val SHOWED_BACKGROUND_RECORDING_INFO = "showedBackgroundRecordingInfo"
+        const val SHOWED_TUTORIAL_INFO = "showedWebsiteTutorialInfo"
 
         const val DEFAULT_RESOLUTION = "1920x1080"
     }

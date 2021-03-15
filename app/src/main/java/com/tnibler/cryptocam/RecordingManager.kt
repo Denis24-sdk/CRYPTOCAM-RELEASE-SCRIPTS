@@ -16,10 +16,10 @@ class RecordingManager(
     private val videoCapture: VideoStreamCapture,
     private val videoInfo: VideoAudioMuxer.VideoInfo,
     private val audioInfo: VideoAudioMuxer.AudioInfo,
-    private val readyToRecordListener: () -> Unit,
     private val executor: Executor,
     private val coroutineScope: CoroutineScope,
-    private val outputFileManager: OutputFileManager
+    private val outputFileManager: OutputFileManager,
+    private val videoPacketCallback: (() -> Unit)? = null
 ) {
     private val TAG = javaClass.simpleName
     var state: State = State.NOT_RECORDING
@@ -30,13 +30,7 @@ class RecordingManager(
     private var firstFrameTimestamp: Long = 0
     private var recordingStartMillis: Long = 0
 
-    init {
-        coroutineScope.launch {
-            setUpMuxer()
-        }
-    }
-
-    private fun setUpMuxer() {
+    fun setUp() {
         Log.d(TAG, "setting up muxer")
         firstFrameTimestamp = 0L
         videoCapture.setEncodedBufferHandler(object : EncodedBufferHandler {
@@ -55,6 +49,7 @@ class RecordingManager(
                 }
                 muxingHandler.post {
                     muxer.writeEncodedVideoBuffer(data, presentationTimeUs - firstFrameTimestamp)
+                    videoPacketCallback?.invoke()
                 }
             }
 
@@ -62,14 +57,13 @@ class RecordingManager(
                 onRecordingFinished()
             }
         })
-        readyToRecordListener.invoke()
     }
 
     private fun onRecordingFinished() {
         muxer.close()
         Log.d(TAG, "muxer closed")
         coroutineScope.launch {
-            setUpMuxer()
+            setUp()
         }
     }
 

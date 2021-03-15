@@ -5,15 +5,6 @@
     app:startDestination="@id/checkOpenKeychainFragment">
 
     <fragment
-        android:id="@+id/cameraFragment"
-        android:name="com.tnibler.cryptocam.CameraFragment"
-        tools:layout="@layout/camera_screen"
-        android:label="CameraFragment">
-        <action
-            android:id="@+id/action_cameraFragment_to_settingsFragment"
-            app:destination="@id/settingsFragment"/>
-    </fragment>
-    <fragment
         android:id="@+id/settingsFragment"
         android:name="com.tnibler.cryptocam.preference.SettingsFragment"
         android:label="SettingsFragment" />
@@ -43,9 +34,6 @@
             app:popUpTo="@id/checkOpenKeychainFragment"
             app:popUpToInclusive="true"/>
     </fragment>
-    <action android:id="@+id/action_global_cameraFragment"
-        app:destination="@id/cameraFragment"
-        app:launchSingleTop="true" />
     <action
         android:id="@+id/action_global_pickOutputDirFragment"
         app:destination="@id/pickOutputDirFragment"
@@ -56,4 +44,21 @@
         app:destination="@id/pickKeyFragment"
         app:enterAnim="@android:anim/slide_in_left"
         app:exitAnim="@android:anim/slide_out_right" />
+    <fragment
+        android:id="@+id/videoFragment"
+        android:name="com.tnibler.cryptocam.VideoFragment"
+        android:label="VideoFragment" />
+    <action
+        android:id="@+id/action_global_videoFragment"
+        app:destination="@id/videoFragment" />
+    <fragment
+        android:id="@+id/infoBackgroundRecordingFragment"
+        android:name="com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingFragment"
+        android:label="InfoBackgroundRecordingFragment"
+        tools:layout="@layout/info_background_recording" />
+    <fragment
+        android:id="@+id/websiteInfoFragment"
+        android:name="com.tnibler.cryptocam.onboarding.WebsiteInfoFragment"
+        android:label="WebsiteInfoFragment"
+        tools:layout="@layout/website_info" />
 </navigation>
