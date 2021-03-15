@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.preference.SettingsFragment
 import org.openintents.openpgp.util.OpenPgpApi
 import org.openintents.openpgp.util.OpenPgpServiceConnection
 
@@ -25,6 +27,10 @@ class App : Application() {
             // or other notification behaviors after this
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(mChannel)
+        }
+        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        if (!sharedPreferences.getBoolean(SettingsFragment.PREF_RECORD_ON_START, false)) {
+            startedRecordingOnLaunch = true
         }
     }
 
