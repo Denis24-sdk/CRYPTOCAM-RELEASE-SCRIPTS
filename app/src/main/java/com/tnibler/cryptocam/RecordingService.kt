@@ -26,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.Duration
@@ -399,6 +400,7 @@ class RecordingService : Service(), LifecycleOwner {
                             false
                         )
                     ) {
+                        delay(400)
                         (application as App).startedRecordingOnLaunch = true
                         toggleRecording()
                     }
