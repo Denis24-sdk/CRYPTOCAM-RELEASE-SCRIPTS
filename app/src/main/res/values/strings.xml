@@ -33,7 +33,7 @@
     <string name="record_on_start">Automatically start recording</string>
     <string name="record_on_start_summary">Video recording will start as soon as the app opens.</string>
     <string name="recording_in_background">Recording in the background</string>
-    <string name="background_recording_desc">Cryptocam supports recording in the background. That means recording will continue even if you exit the app or turn the screen off. Depending on your device\'s manufacturer, Android might stop Cryptocam from running to save battery. To make sure that doesn\'t happen without you noticing, your device will regularly vibrate while recording. If the vibrating stops, it means Cryptocam was killed.</string>
+    <string name="background_recording_desc">Cryptocam supports recording in the background. That means recording will continue even if you exit the app or turn the screen off (!!!This does not work on Android 11 and up!!!).\nDepending on your device\'s manufacturer, Android might stop Cryptocam from running to save battery. To make sure that doesn\'t happen without you noticing, your device will regularly vibrate while recording. If the vibrating stops, it means Cryptocam was killed.</string>
     <string name="vibrate_while_recording">Vibrate during recording</string>
     <string name="vibrate_while_recording_summary">Regularly vibrate while recording in the background so you\'ll know if Cryptocam is killed by Android</string>
     <string name="notification_channel_description">Cryptocam is recording in the background</string>
