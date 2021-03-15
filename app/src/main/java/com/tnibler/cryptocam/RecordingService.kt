@@ -32,6 +32,7 @@ import java.time.Duration
 
 class RecordingService : Service(), LifecycleOwner {
     private val FEEDBACK_INTERVAL = 5_000 // vibrate every ~5 seconds while recording
+    private val VIBRATE_INTENSITY = 128
     private val TAG = javaClass.simpleName
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private val binder = RecordingServiceBinder()
@@ -461,7 +462,7 @@ class RecordingService : Service(), LifecycleOwner {
     private val vibrator by lazy { ContextCompat.getSystemService(this, Vibrator::class.java)!! }
     private fun vibrate() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(50, 255))
+            vibrator.vibrate(VibrationEffect.createOneShot(50, VIBRATE_INTENSITY))
         } else {
             @Suppress("DEPRECATION")
             vibrator.vibrate(50)
