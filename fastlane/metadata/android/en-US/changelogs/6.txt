@@ -1,0 +1,6 @@
+New feature:
+ - Cryptocam now continues to record in that background if the app is closed or the screen turned off. (ONLY FOR ANDROID 10 AND UNDER!)
+
+Fixes:
+ - Improvements to stability
+ - Fixed a bug causing videos to be recorded in weird aspect ratios sometimes

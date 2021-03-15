@@ -1,0 +1,6 @@
+Neue Funktion:
+ - Cryptocam nimm nun weiter auf, wenn der Bildschirm ausgeschaltet oder die App verlassen wird. (NUR BIS ANDROID 10!)
+
+Fixes:
+ - Verbesserte Stabilität
+ - Bugfix: Videos werden nicht mehr manchmal in seltsamen Seitenformaten aufenommen
