@@ -19,7 +19,6 @@ import java.io.OutputStream
 class OpenPgpManager {
     private val TAG = javaClass.simpleName
     private val scope = GlobalScope
-    var status: OpenPgpStatus = OpenPgpStatus.NOT_BOUND
     lateinit var api: OpenPgpApi
 
     enum class OpenPgpStatus {
@@ -128,7 +127,7 @@ class OpenPgpManager {
             }
             OpenPgpApi.RESULT_CODE_SUCCESS -> {
                 val ids = result.getLongArrayExtra(OpenPgpApi.RESULT_KEY_IDS)
-                Log.d(TAG, "success key ids: ${ids.map { OpenPgpUtils.convertKeyIdToHex(it) }}")
+                Log.d(TAG, "success key ids: ${ids?.map { OpenPgpUtils.convertKeyIdToHex(it) }}")
                 onKeyChosen(true, ids?.toList() ?: listOf())
             }
         }

@@ -9,12 +9,13 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
+import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
-import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.databinding.PickOutDirectoryBinding
+import com.tnibler.cryptocam.preference.SettingsFragment
 
 class PickOutputDirFragment : Fragment() {
     lateinit var binding: PickOutDirectoryBinding
@@ -37,6 +38,10 @@ class PickOutputDirFragment : Fragment() {
                 PreferenceManager.getDefaultSharedPreferences(requireContext()).edit {
                     putString(SettingsFragment.PREF_OUTPUT_DIRECTORY, uri.toString())
                     commit()
+                }
+                val dir = DocumentFile.fromTreeUri(requireContext(), uri)
+                if (dir?.findFile(".nomedia") == null) {
+                    dir?.createFile("asd/asd", ".nomedia")
                 }
                 (requireActivity() as MainActivity).nextOnboardingScreen(R.id.pickOutputDirFragment)
             }

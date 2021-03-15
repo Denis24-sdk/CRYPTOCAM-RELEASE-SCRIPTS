@@ -84,6 +84,7 @@
         android:layout_marginStart="8dp"
         android:background="@drawable/bg_recording_time"
         android:padding="8dp"
+        android:visibility="invisible"
         android:gravity="center_vertical">
 
         <ImageView
@@ -112,8 +113,5 @@
         android:focusable="false"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@id/overlayControls"/>
-
-
-
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -44,6 +44,7 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="32dp"
                 android:layout_marginBottom="16dp"
+                android:textColor="#fff"
                 android:text="@string/pick_key_desc"
                 android:textSize="20sp" />
 
