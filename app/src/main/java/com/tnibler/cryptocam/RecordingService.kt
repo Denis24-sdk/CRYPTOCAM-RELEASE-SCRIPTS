@@ -146,6 +146,7 @@ class RecordingService : Service(), LifecycleOwner {
         super.onDestroy()
         Log.d(TAG, "onDestroy()")
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        orientationEventListener.disable()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
