@@ -1,6 +1,9 @@
 Cryptocam allows you to record while encrypting video and audio on the fly using AES-128 and OpenPGP.
 
+<h3>Find a full tutorial on <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a></h3>
+
 Worried that your device or memory card might get into the wrong hands with sensitive footage on it? 
 Cryptocam uses OpenKeychain to encrypt recorded video without ever persisting unencrypted data to device storage.
 
-Encryption is done using ffmpeg/libav's MP4-CENC feature, so decryption can be done with ffmpeg and <a hrref="https://gitlab.com/tnibler/cryptocam-companion">a small helper script</a>.
+Encryption is done using ffmpeg/libav's MP4-CENC feature, so decryption can be done with ffmpeg and <a href="https://gitlab.com/tnibler/cryptocam-companion">a the companion desktop app</a>.
+
