@@ -6,8 +6,6 @@ import android.util.Log
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import org.openintents.openpgp.OpenPgpError
 import org.openintents.openpgp.util.OpenPgpApi
 import org.openintents.openpgp.util.OpenPgpUtils
@@ -18,7 +16,6 @@ import java.io.OutputStream
 
 class OpenPgpManager {
     private val TAG = javaClass.simpleName
-    private val scope = GlobalScope
     lateinit var api: OpenPgpApi
 
     enum class OpenPgpStatus {
@@ -31,14 +28,12 @@ class OpenPgpManager {
         setChooseKeyActivityResultListener: ((ActivityResult) -> Unit) -> Unit,
         onKeyChosen: (Boolean, List<Long>) -> Unit
     ) {
-        scope.launch {
-            getKeyIds(
-                Intent(),
-                onKeyChosen,
-                chooseKeyActivityResult,
-                setChooseKeyActivityResultListener
-            )
-        }
+        getKeyIds(
+            Intent(),
+            onKeyChosen,
+            chooseKeyActivityResult,
+            setChooseKeyActivityResultListener
+        )
     }
 
     fun encryptText(text: String, out: OutputStream, keyIds: Collection<Long>) {
