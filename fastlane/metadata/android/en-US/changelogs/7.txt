@@ -1,0 +1,2 @@
+ - Fix crash when picking OpenPgp keys
+ - Add licenses screen in settings
