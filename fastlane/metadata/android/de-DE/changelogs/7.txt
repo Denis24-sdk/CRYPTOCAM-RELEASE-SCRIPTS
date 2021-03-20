@@ -1,0 +1,2 @@
+ - Crash beim Schlüssel auswählen gefixt
+ - Auflistung der Lizenzen für Libraries und Icons
