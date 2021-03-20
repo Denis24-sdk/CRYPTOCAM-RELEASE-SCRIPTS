@@ -61,4 +61,8 @@
         android:name="com.tnibler.cryptocam.onboarding.WebsiteInfoFragment"
         android:label="WebsiteInfoFragment"
         tools:layout="@layout/website_info" />
+    <fragment
+        android:id="@+id/licensesFragment"
+        android:name="com.tnibler.cryptocam.preference.LicensesFragment"
+        android:label="LicensesFragment" />
 </navigation>

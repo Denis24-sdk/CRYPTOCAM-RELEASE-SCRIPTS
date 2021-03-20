@@ -43,4 +43,6 @@
     <string name="tutorial_website">Cryptocam tutorial site</string>
     <string name="tutorial_website_description">There is a full tutorial available on the Cryptocam website. It will explain how to generate keys, set them up in Cryptocam and how to decrypt videos.</string>
     <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io">Go to tutorial</a></string>
+    <string name="licenses">Licenses</string>
+    <string name="licenses_description">Image and library licenses</string>
 </resources>

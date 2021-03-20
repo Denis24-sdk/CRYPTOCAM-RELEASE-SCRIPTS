@@ -9,6 +9,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
+import androidx.navigation.fragment.findNavController
 import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -152,6 +153,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
             getString(R.string.vibrate_while_recording_summary)
 
         screen.addPreference(vibrateWhileRecordingPreference)
+
+        val licensePreference = Preference(context)
+        licensePreference.key = "licenses"
+        licensePreference.title = getString(R.string.licenses)
+        licensePreference.summary = getString(R.string.licenses_description)
+        licensePreference.setOnPreferenceClickListener {
+            findNavController().navigate(R.id.licensesFragment)
+            true
+        }
+        screen.addPreference(licensePreference)
 
         preferenceScreen = screen
     }
