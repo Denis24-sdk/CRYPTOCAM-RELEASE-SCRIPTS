@@ -81,15 +81,12 @@ class MainActivity : AppCompatActivity() {
     fun nextOnboardingScreen(@IdRes currentDestination: Int) {
         when (currentDestination) {
             R.id.checkOpenKeychainFragment -> {
-                if (!keyExists()) {
-                    navController.navigate(R.id.pickKeyFragment)
-                } else if (!outputDirExists()) {
-                    navController.navigate(R.id.pickOutputDirFragment)
+                val shouldShowTutorialInfo =
+                    !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
+                if (shouldShowTutorialInfo) {
+                    navController.navigate(R.id.websiteInfoFragment)
                 } else {
-                    if (navController.currentDestination?.id != R.id.videoFragment) {
-                        navController.popBackStack(R.id.pickKeyFragment, true)
-                        goToInfoBackgroundRecordingOrVideoFragment()
-                    }
+                    nextOnboardingScreen(R.id.websiteInfoFragment)
                 }
             }
             R.id.pickKeyFragment -> {
@@ -112,7 +109,16 @@ class MainActivity : AppCompatActivity() {
                 goToInfoBackgroundRecordingOrVideoFragment()
             }
             R.id.websiteInfoFragment -> {
-                navController.navigate(R.id.videoFragment)
+                if (!keyExists()) {
+                    navController.navigate(R.id.pickKeyFragment)
+                } else if (!outputDirExists()) {
+                    navController.navigate(R.id.pickOutputDirFragment)
+                } else {
+                    if (navController.currentDestination?.id != R.id.videoFragment) {
+                        navController.popBackStack(R.id.pickKeyFragment, true)
+                        goToInfoBackgroundRecordingOrVideoFragment()
+                    }
+                }
             }
         }
     }
@@ -120,12 +126,8 @@ class MainActivity : AppCompatActivity() {
     private fun goToInfoBackgroundRecordingOrVideoFragment() {
         val shouldShowBackgroundRecordingInfo =
             !sharedPreferences.getBoolean(SettingsFragment.SHOWED_BACKGROUND_RECORDING_INFO, false)
-        val shouldShowTutorialInfo =
-            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
         if (shouldShowBackgroundRecordingInfo) {
             navController.navigate(R.id.infoBackgroundRecordingFragment)
-        } else if (shouldShowTutorialInfo) {
-            navController.navigate(R.id.websiteInfoFragment)
         } else {
             navController.navigate(R.id.videoFragment)
         }
