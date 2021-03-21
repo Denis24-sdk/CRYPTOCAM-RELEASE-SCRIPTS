@@ -14,6 +14,7 @@ ApplicationWindow {
     visible: true
     title: "Cryptocam Companion"
     DropArea {
+        anchors.fill: parent
         id: dropArea
         onEntered: {
             if (drag.hasUrls) {
