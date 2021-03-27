@@ -1,0 +1,2 @@
+Fix:
+ - Crash wenn OpenKeychain nicht installiert ist, Cryptocam verlassen wird um OpenKeychain zu installieren um dann wieder Cryptocam geöffnet wird

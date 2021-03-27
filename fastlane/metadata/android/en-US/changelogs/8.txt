@@ -1,0 +1,2 @@
+Fixed:
+ - Crash when OpenKeychain isn't installed, Cryptocam is closed to install OpenKeychain and then opened again.
