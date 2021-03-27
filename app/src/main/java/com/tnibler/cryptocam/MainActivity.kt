@@ -187,8 +187,8 @@ class MainActivity : AppCompatActivity() {
                 "org.sufficientlysecure.keychain",
                 object : OpenPgpServiceConnection.OnBound {
                     override fun onError(e: Exception?) {
-//                    Toast.makeText(this@MainActivity, R.string.error_openpgp_connection, Toast.LENGTH_LONG).show()
-                        navController.navigate(R.id.action_checkOpenKeychainFragment_to_installOpenKeychainFragment)
+//                        Toast.makeText(this@MainActivity, R.string.error_openpgp_connection, Toast.LENGTH_LONG).show()
+                        navController.navigate(R.id.installOpenKeychainFragment)
                     }
 
                     override fun onBound(service: IOpenPgpService2?) {
