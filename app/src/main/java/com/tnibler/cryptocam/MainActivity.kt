@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Log.d(TAG, "onResume()")
         val app = (application as App)
-        if (app.openPgpServiceConnection == null) {
+        if (app.openPgpServiceConnection == null || app.openPgpApi == null) {
             Log.d(TAG, "Connecting to OpenKeychain")
             connectOpenPgp()
         } else {
