@@ -46,14 +46,11 @@ pub fn decrypt(
     decrypted.read_exact(&mut encrypted_header)?;
     let file_type = encrypted_header[0];
     let offset_to_data = bytes::LittleEndian::read_u32(&encrypted_header[1..5]);
-    debug!("File type: {}", file_type);
-    debug!("Offset to data: {}", offset_to_data);
     let bytes_before_metadata: usize = encrypted_header.len();
     let metadata_len: usize = offset_to_data as usize - bytes_before_metadata;
     let mut metadata_bytes = vec![0; metadata_len];
     decrypted.read_exact(&mut metadata_bytes)?;
     let metadata = parse_video_metadata(str::from_utf8(&metadata_bytes)?)?;
-    println!("{:#?}", metadata);
     Ok(Box::new(VideoMuxingJob {
         params: Box::new(VideoMuxingJobParams {
             data: Box::new(decrypted),
