@@ -17,23 +17,6 @@ variables:
   ANDROID_SDK_TOOLS:   "6858069"
   ANDROID_COMPILE_NDK: "22.1.7171670"
 
-before_script:
-  - curl https://dl.google.com/go/go1.16.3.linux-amd64.tar.gz | tar xz -C /usr/local
-  - ln -s /usr/local/go/bin/go /usr/sbin/go
-  - go version
-  - apt-get --quiet update --yes
-  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}"
-  - sdkmanager "ndk;${ANDROID_COMPILE_NDK}"
-  - sdkmanager "platform-tools"
-  - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}"
-  - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_COMPILE_NDK
-  - export GRADLE_USER_HOME=$(pwd)/.gradle
-  - chmod +x ./gradlew
-
-  - go get golang.org/x/mobile/cmd/gomobile
-  - go get golang.org/x/mobile/cmd/gobind
-  - export PATH=~/go/bin:$PATH
-
 stages:
   - build
   - release
@@ -41,6 +24,22 @@ stages:
 assembleRelease:
   stage: build
   script:
+    - curl https://dl.google.com/go/go1.16.3.linux-amd64.tar.gz | tar xz -C /usr/local
+    - ln -s /usr/local/go/bin/go /usr/sbin/go
+    - go version
+    - apt-get --quiet update --yes
+    - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}"
+    - sdkmanager "ndk;${ANDROID_COMPILE_NDK}"
+    - sdkmanager "platform-tools"
+    - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}"
+    - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_COMPILE_NDK
+    - export GRADLE_USER_HOME=$(pwd)/.gradle
+    - chmod +x ./gradlew
+
+    - go get golang.org/x/mobile/cmd/gomobile
+    - go get golang.org/x/mobile/cmd/gobind
+    - export PATH=~/go/bin:$PATH
+    -
     - mkdir app/libs
     - cd age-encryption
     - ~/go/bin/gomobile init
