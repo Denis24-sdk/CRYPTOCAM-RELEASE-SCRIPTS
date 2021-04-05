@@ -39,7 +39,7 @@ assembleRelease:
     - go get golang.org/x/mobile/cmd/gomobile
     - go get golang.org/x/mobile/cmd/gobind
     - export PATH=~/go/bin:$PATH
-    -
+
     - mkdir app/libs
     - cd age-encryption
     - ~/go/bin/gomobile init
