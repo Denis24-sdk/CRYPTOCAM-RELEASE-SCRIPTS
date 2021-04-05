@@ -23,10 +23,13 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.VideoScreenBinding
+import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.preference.SettingsKey
+import com.zhuinden.simplestackextensions.fragmentsktx.backstack
+import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 
@@ -39,6 +42,7 @@ class VideoFragment : Fragment() {
             requireContext()
         )
     }
+    private val keyManager: KeyManager by lazy { lookup() }
 
     var service: RecordingService? = null
         private set
@@ -61,8 +65,8 @@ class VideoFragment : Fragment() {
     private fun onServiceBound(service: RecordingService) {
         Log.d(TAG, "onServiceBound")
         service.background()
-        service.initOpenPgp((requireActivity() as MainActivity).openPgpKeyManager)
         onStateChanged(service.state.value)
+        service.init(keyManager.selectedRecipients.value)
         lifecycleScope.launchWhenResumed {
             service.state.collect { state ->
                 onStateChanged(state)
@@ -81,10 +85,10 @@ class VideoFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding = VideoScreenBinding.bind(view)
         val binding = binding!!
-        if (!allPermissionsGranted()) {
+        if (!allPermissionsGranted(requireContext())) {
             val requestPermissions = ActivityResultContracts.RequestMultiplePermissions()
             registerForActivityResult(requestPermissions) { result ->
-                if (allPermissionsGranted()) {
+                if (allPermissionsGranted(requireContext())) {
                     setupUi(binding)
                     val service = service
                     if (service == null) {
@@ -116,7 +120,7 @@ class VideoFragment : Fragment() {
             }
             btnRecordVideo.setOnClickListener { service?.toggleRecording() }
             btnSettings.setOnClickListener {
-                findNavController().navigate(R.id.settingsFragment)
+                backstack.goTo(SettingsKey())
             }
             if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
                 lifecycleScope.launchWhenResumed {
@@ -304,12 +308,6 @@ class VideoFragment : Fragment() {
         binding = null
     }
 
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(
-            requireContext(), it
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
     private fun debugToast(msg: String) =
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
 
@@ -322,7 +320,13 @@ class VideoFragment : Fragment() {
     }
 
     companion object {
-        private val REQUIRED_PERMISSIONS =
+        val REQUIRED_PERMISSIONS =
             arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+
+        fun allPermissionsGranted(context: Context) = REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(
+                context, it
+            ) == PackageManager.PERMISSION_GRANTED
+        }
     }
 }

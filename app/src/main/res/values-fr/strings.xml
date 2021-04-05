@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cryptocam</string>
+    <string name="error_picking_directory">Une erreur est survenue en choisissant le fichier de destination.</string>
+    <string name="pref_output_directory">Changer le fichier de destination</string>
+    <string name="choose_output_directory">Choisir un fichier de destination</string>
+    <string name="pick_out_dir_desc">Veuillez créer et choisir und fichier où les vidéos chiffrées seront sauvegardées.</string>
+    <string name="open_file_picker">Choisir un fichier</string>
+    <string name="pick_key_desc">Pour utiliser Cryptocam, veuillez importer une clé en scannant un code QR dans l\'application Cryptocam Companion.</string>
+    <string name="pref_output_directory_summary">Les vidéos chiffrées seront sauvegardées ici</string>
+    <string name="video_framerate">Taux d\'images/Framerate des vidéos</string>
+    <string name="video_resolution">Résolution des vidéos</string>
+    <string name="video_resolution_summary">%s (Il est possible que toutes les résolutions ne soient pas disponibles)</string>
+    <string name="actual_recording_resolution">Véritable résolution: %s</string>
+    <string name="enable_overlay">Activer l\'avertissement</string>
+    <string name="enable_overlay_summary">Laisser savoir les gens autour que vos vidéos sont chiffrées.</string>
+    <string name="record_on_start_summary">Lancer l\'enregistrement dès que l\'application est ouverte</string>
+    <string name="record_on_start">Enregistrement automatique</string>
+    <string name="recording_in_background">Enregistrement en arrière-plan</string>
+    <string name="background_recording_desc">Cryptocam continue l\'enregistrement quand l\'application est mise en arrière-plan ou l\'appareil est mis en veille (!!!Seulement pour Android 10 et plus ancien!!!). En fonction du fabricant, il est possible que Android suspende l\'application pour économiser la batterie. Pour veiller à ce que vous remarquiez cela, l\'appareil vibrera régulièrement pendant l\'enregistrement. Si les vibrations cessent, Cryptocam à été stoppé par le Système.</string>
+    <string name="vibrate_while_recording">Vibrer pendant l\'engregistrement</string>
+    <string name="vibrate_while_recording_summary">Vibrer régulièrement quand Cryptocam enregistre en arrière-plan</string>
+    <string name="notification_channel_description">Enregistrement en arrière-plan en cours</string>
+    <string name="notification_channel_name">Enregistrement en arrière-plan</string>
+    <string name="notification_text">Enregistrement: %s</string>
+    <string name="notification_title">Enregistrement en arrière-plan en cours</string>
+    <string name="tutorial_website">Tutoriel Cryptocam</string>
+    <string name="tutorial_website_description">Il existe un tutoriel détaillé sur le site de Cryptocam. Il expliquera la génération de clés, comment les importer, transférer les enregistrements sur le PC et enfin le procédé de déchiffrement.</string>
+    <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io/fr">Visiter le site</a></string>
+    <string name="licenses">Licenses</string>
+    <string name="licenses_description">Licenses des images et bibliothèques</string>
+    <string name="title_keys">Mes clés</string>
+    <string name="key_list_desc">Toutes les clés cochées seront capables de déchiffrer les enregistrements chiffrés. Pour importer une nouvelle clé, veuillez scanner un code QR dans l\'application Cryptocam Companion.</string>
+    <string name="qr_scan_fail">Une erreur est survenue en important la clé. Veuillez réessayer.</string>
+    <string name="import_key_fail">Une erreur est survenue en important la clé. Peut-être qu\'elle existe déjà?</string>
+    <string name="save_key">Sauvegarder la clé</string>
+    <string name="fingerprint">Identifiant:</string>
+    <string name="name_empty_error">Veillez donner un nom.</string>
+    <string name="import_key">Importer une clé</string>
+    <string name="scan_qrcode">Scanner un code QR</string>
+    <string name="pref_keys">Clés</string>
+    <string name="pref_keys_summary">Gestion des clés utilisées pour le cryptage</string>
+    <string name="must_select_one_key">Veullez cocher au moins une clé.</string>
+    <string name="no_key_selected">Aucune clé sélectionnée! Veuillez cocher une clé dans les règlages.</string>
+    <string name="open_tutorial_site">Visiter le site turoriel</string>
+    <string name="tutorial_url">https://cryptocam.gitlab.io/fr</string>
+</resources>

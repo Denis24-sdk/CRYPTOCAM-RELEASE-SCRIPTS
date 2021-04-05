@@ -1,0 +1,9 @@
+Cryptocam permet d'enregistrer des vidéos chiffrées de manière à ce que les données non-chiffrées
+ne soient jamais sauvegardées.
+
+<h3>Consultez le tutoriel complet sur <a href="https://cryptocam.gitlab.io/fr">https://cryptocam.gitlab.io/fr</a></h3>
+
+Poserait-il un problème qu'un un acteur malveillant accède à vos enregistrements sensibles?
+Cryptocam protège vos vidéos dans le cas où un tiers a physiquement accès à votre appareil ou carte
+mémoire en chiffrant les enregistrement de manière à ce qu'ils ne touchent jamais à la mémoire persistante
+avant d'être cryptés.

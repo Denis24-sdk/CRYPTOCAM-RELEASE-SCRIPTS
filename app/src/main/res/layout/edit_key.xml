@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/editKeyTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:text="Import key" />
+
+    <TextView
+        android:id="@+id/editKeyPublicKeyView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/editKeyTitle"
+        tools:text="age1kmqpg6ywvmlety6qkpemppvgvs0cfqng06kn5x89czew734tr52snj7wed" />
+
+    <TextView
+        android:id="@+id/editKeyFingerprintLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/fingerprint"
+        android:textSize="16sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editKeyPublicKeyView" />
+
+    <TextView
+        android:id="@+id/editKeyFingerprintView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textSize="16sp"
+        app:layout_constraintBaseline_toBaselineOf="@id/editKeyFingerprintLabel"
+        app:layout_constraintStart_toEndOf="@id/editKeyFingerprintLabel"
+        tools:text="d80f044493bc80be255ce0594cc28bc" />
+
+    <EditText
+        android:id="@+id/editKeyNameEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/editKeyFingerprintView"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:text="Some key name" />
+
+    <Button
+        android:id="@+id/editKeyButtonCancel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="@style/Widget.MaterialComponents.Button.TextButton.Dialog"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:text="@android:string/cancel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editKeyNameEdit" />
+
+    <Button
+        android:id="@+id/editKeyButtonSave"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/save_key"
+        style="@style/Widget.MaterialComponents.Button.TextButton.Dialog"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editKeyButtonCancel" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

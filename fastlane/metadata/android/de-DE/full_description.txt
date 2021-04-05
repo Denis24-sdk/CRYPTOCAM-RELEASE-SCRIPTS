@@ -1,9 +1,9 @@
-Cryptocam ermöglicht, live-verschlüsselte Video- und Tonaufnahmen anzufertigen.
+Cryptocam ermöglicht es, live-verschlüsselte Videoaufnahmen anzufertigen, sodass sie sicher vor
+Zugriff durch einen Angreifer mit physischem Zugriff auf dein Gerät oder deine Speicherkarte sind.
 
-<h3>Eine komplette Anleitung ist auf <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a> zu finden</h3>
+<h3>Eine komplette Anleitung ist auf <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io/de</a>
+zu finden</h3>
 
 Besteht das Risiko, dass dein Gerät oder deine Speicherkarte mit sensiblen Aufnahmen in die falschen Hände gerät?
-Cryptocam nutzt OpenKeychain um verschlüsselte Aufnahmen anzufertigen, ohne je unverschlüsselte Daten in den Speicher zu schreiben.
-
-Die Verschlüsselung geschieht durch ffmpeg/libavs MP4-CENC Funktion, sodass die Entschlüsselung mit ffmpeg und <a href="https://gitlab.com/tnibler/cryptocam-companion">dem Companion-Tool</a> auf dem Desktop durchgeführt werden kann.
-
+Cryptocam nutzt <a href="https://github.com/FiloSottile/age">age</a> (X25519 und ChaCha20) um verschlüsselte Aufnahmen anzufertigen,
+ohne je unverschlüsselte Daten in den Speicher zu schreiben.

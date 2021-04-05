@@ -1,0 +1,13 @@
+Version 2.0.0, BIG UPDATE:
+
+Cryptocam no longer uses OpenPGP or ffmpeg to encrypt videos. That means:
+ - better encryption with age (X25519 and Chacha20) that is impossible to configure insecurely
+   Note: Cryptocam was always secure by default, but you can generate weak GPG keys if you try hard enough
+ - key import by scanning qr codes instead of copying keyfiles
+ - no dependency on OpenKeychain anymore
+ - less bugs and crashes due to interaction with OpenKeychain
+ - much smaller APK download
+ - more easily auditable codebase by not including libavformat
+
+A new version of the Cryptocam Companion app is required to generate keys and decrypt videos recorded
+with this version.

@@ -1,44 +1,44 @@
 package com.tnibler.cryptocam
 
 import android.annotation.SuppressLint
-import android.app.Activity
-import android.app.PendingIntent
-import android.content.*
+import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
-import android.widget.Toast
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.IdRes
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
-import androidx.navigation.NavController
-import androidx.navigation.Navigation
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.ActivityMainBinding
+import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.keys.KeysKey
+import com.tnibler.cryptocam.keys.parseImportUri
+import com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingKey
+import com.tnibler.cryptocam.onboarding.PickKeyKey
+import com.tnibler.cryptocam.onboarding.PickOutputDirKey
+import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
 import com.tnibler.cryptocam.preference.SettingsFragment
-import org.openintents.openpgp.IOpenPgpService2
-import org.openintents.openpgp.OpenPgpError
-import org.openintents.openpgp.util.OpenPgpApi
-import org.openintents.openpgp.util.OpenPgpServiceConnection
-import java.io.InputStream
+import com.zhuinden.simplestack.SimpleStateChanger
+import com.zhuinden.simplestack.StateChange
+import com.zhuinden.simplestack.navigator.Navigator
+import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey
+import com.zhuinden.simplestackextensions.fragments.DefaultFragmentStateChanger
+import com.zhuinden.simplestackextensions.navigatorktx.backstack
+import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
+import com.zhuinden.simplestackextensions.servicesktx.get
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
-//TODO licenses for images
 @SuppressLint("RestrictedApi")
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     private val TAG = javaClass.simpleName
     private lateinit var binding: ActivityMainBinding
-    private lateinit var navController: NavController
-    lateinit var openPgpServiceConnection: OpenPgpServiceConnection
-    lateinit var openPgpApi: OpenPgpApi
-    val openPgpKeyManager = OpenPgpManager()
+    private lateinit var fragmentStateChanger: DefaultFragmentStateChanger
     private lateinit var sharedPreferences: SharedPreferences
-
+    private val keyManager by lazy { (application as App).globalServices.get<KeyManager>() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,98 +60,92 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
 
-        navController = Navigation.findNavController(this, R.id.navHostFragment)
+        fragmentStateChanger = DefaultFragmentStateChanger(supportFragmentManager, R.id.container)
+
+        val action = intent?.action
+        val data = intent?.data
+        Log.d(TAG, "action $action, data $data")
+        if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
+            // import key from deep link qr code
+            val recipient = parseImportUri(data.toString())
+            if (recipient == null) {
+                regularStart()
+                return
+            }
+            val firstKey = if (outputDirExists()) {
+                VideoKey()
+            } else {
+                PickOutputDirKey()
+            }
+            val initialHistory = listOf(firstKey, KeysKey(recipient))
+            Navigator.configure()
+                .setGlobalServices((application as App).globalServices)
+                .setScopedServices(DefaultServiceProvider())
+                .setStateChanger(SimpleStateChanger(this@MainActivity))
+                .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+        } else {
+            regularStart()
+        }
+    }
+
+    private fun regularStart() {
+        val keys = runBlocking { keyManager.availableKeys.first() }
+        val shouldShowTutorialInfo =
+            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
+        val shouldShowBackgroundRecordingInfo =
+            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_BACKGROUND_RECORDING_INFO, false)
+        val initialKey = when {
+            shouldShowTutorialInfo -> WebsiteInfoKey()
+            shouldShowBackgroundRecordingInfo -> InfoBackgroundRecordingKey()
+            keys.isEmpty() -> PickKeyKey()
+            !outputDirExists() -> PickOutputDirKey()
+            else -> VideoKey()
+        }
+        val initialHistory = listOf(initialKey)
+        Navigator.configure()
+            .setGlobalServices((application as App).globalServices)
+            .setScopedServices(DefaultServiceProvider())
+            .setStateChanger(SimpleStateChanger(this@MainActivity))
+            .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+    }
+
+    override fun onNavigationEvent(stateChange: StateChange) {
+        fragmentStateChanger.handleStateChange(stateChange)
+    }
+
+    override fun onBackPressed() {
+        if (!Navigator.onBackPressed(this)) {
+            super.onBackPressed()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume()")
-        val app = (application as App)
-        if (app.openPgpServiceConnection == null || app.openPgpApi == null) {
-            Log.d(TAG, "Connecting to OpenKeychain")
-            connectOpenPgp()
-        } else {
-            openPgpServiceConnection = app.openPgpServiceConnection!!
-            openPgpApi = app.openPgpApi!!
-            openPgpKeyManager.api = openPgpApi
-            onOpenPgpConnected()
-        }
     }
 
-    fun nextOnboardingScreen(@IdRes currentDestination: Int) {
+    fun nextOnboardingScreen(currentDestination: DefaultFragmentKey) {
         when (currentDestination) {
-            R.id.checkOpenKeychainFragment -> {
-                val shouldShowTutorialInfo =
-                    !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
-                if (shouldShowTutorialInfo) {
-                    navController.navigate(R.id.websiteInfoFragment)
-                } else {
-                    nextOnboardingScreen(R.id.websiteInfoFragment)
-                }
-            }
-            R.id.pickKeyFragment -> {
+            is PickKeyKey -> {
                 if (!outputDirExists()) {
-                    navController.navigate(R.id.pickOutputDirFragment)
+                    backstack.goTo(PickOutputDirKey())
                 } else {
-                    if (navController.currentDestination?.id != R.id.videoFragment) {
-                        navController.popBackStack(R.id.pickKeyFragment, true)
-                        goToInfoBackgroundRecordingOrVideoFragment()
-                    }
+                    backstack.setHistory(
+                        listOf<DefaultFragmentKey>(VideoKey()),
+                        StateChange.FORWARD
+                    )
                 }
             }
-            R.id.pickOutputDirFragment -> {
-                if (navController.currentDestination?.id != R.id.videoFragment) {
-                    navController.popBackStack(R.id.pickKeyFragment, true)
-                    goToInfoBackgroundRecordingOrVideoFragment()
+            is PickOutputDirKey -> {
+                backstack.setHistory(listOf<DefaultFragmentKey>(VideoKey()), StateChange.FORWARD)
+            }
+            is InfoBackgroundRecordingKey -> {
+                when {
+                    keyManager.availableKeys.value.isEmpty() -> backstack.goTo(PickKeyKey())
+                    !outputDirExists() -> backstack.goTo(PickOutputDirKey())
+                    else -> backstack.setHistory(listOf(VideoKey()), StateChange.FORWARD)
                 }
             }
-            R.id.infoBackgroundRecordingFragment -> {
-                goToInfoBackgroundRecordingOrVideoFragment()
-            }
-            R.id.websiteInfoFragment -> {
-                if (!keyExists()) {
-                    navController.navigate(R.id.pickKeyFragment)
-                } else if (!outputDirExists()) {
-                    navController.navigate(R.id.pickOutputDirFragment)
-                } else {
-                    if (navController.currentDestination?.id != R.id.videoFragment) {
-                        navController.popBackStack(R.id.pickKeyFragment, true)
-                        goToInfoBackgroundRecordingOrVideoFragment()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun goToInfoBackgroundRecordingOrVideoFragment() {
-        val shouldShowBackgroundRecordingInfo =
-            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_BACKGROUND_RECORDING_INFO, false)
-        if (shouldShowBackgroundRecordingInfo) {
-            navController.navigate(R.id.infoBackgroundRecordingFragment)
-        } else {
-            navController.navigate(R.id.videoFragment)
-        }
-    }
-
-    private fun keyExists(): Boolean {
-        try {
-            val savedKeys =
-                sharedPreferences.getStringSet(SettingsFragment.PREF_OPENPGP_KEYIDS, setOf())
-                    ?.map { it.toLong() } ?: return false
-            if (savedKeys.isEmpty()) {
-                return false
-            }
-            val validKeys = savedKeys.filter { keyId -> openPgpKeyManager.checkKeyIdIsValid(keyId) }
-            sharedPreferences.edit(commit = true) {
-                putStringSet(
-                    SettingsFragment.PREF_OPENPGP_KEYIDS,
-                    validKeys.map { it.toString() }.toSet()
-                )
-            }
-            return validKeys.isNotEmpty()
-        }
-        catch (e: Exception) {
-            return false
         }
     }
 
@@ -166,93 +160,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    val openPGPUserInteractionActivityResult =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            if (result.resultCode != Activity.RESULT_OK) {
-                Toast.makeText(
-                    this@MainActivity,
-                    getString(R.string.error_openkeychain_permissions),
-                    Toast.LENGTH_LONG
-                ).show()
-                finish()
-            }
-            onOpenPgpConnected()
-        }
-
-    fun connectOpenPgp() {
-        val app = (application as App)
-        val conn =
-            OpenPgpServiceConnection(
-                this,
-                "org.sufficientlysecure.keychain",
-                object : OpenPgpServiceConnection.OnBound {
-                    override fun onError(e: Exception?) {
-//                        Toast.makeText(this@MainActivity, R.string.error_openpgp_connection, Toast.LENGTH_LONG).show()
-                        navController.navigate(R.id.installOpenKeychainFragment)
-                    }
-
-                    override fun onBound(service: IOpenPgpService2?) {
-                        Log.d(TAG, "OpenPGP service bound.")
-                        openPgpApi = OpenPgpApi(app, openPgpServiceConnection.service)
-                        app.openPgpApi = openPgpApi
-                        openPgpKeyManager.api = openPgpApi
-                        val result = openPgpApi.executeApi(Intent().apply {
-                            action = OpenPgpApi.ACTION_CHECK_PERMISSION
-                        }, null as InputStream?, null)
-                        when (result.getIntExtra(
-                            OpenPgpApi.RESULT_CODE,
-                            OpenPgpApi.RESULT_CODE_ERROR
-                        )) {
-                            OpenPgpApi.RESULT_CODE_SUCCESS -> {
-                                onOpenPgpConnected()
-                            }
-                            OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED -> {
-                                val pi =
-                                    result.getParcelableExtra<PendingIntent>(OpenPgpApi.RESULT_INTENT)!!
-                                val intentSenderRequest = IntentSenderRequest.Builder(pi).build()
-                                try {
-                                    openPGPUserInteractionActivityResult.launch(intentSenderRequest)
-                                } catch (e: IntentSender.SendIntentException) {
-                                    Log.e(TAG, "SendIntentException", e)
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "Error starting OpenKeychain intent.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    finish()
-                                }
-                            }
-                            OpenPgpApi.RESULT_CODE_ERROR -> {
-                                val error =
-                                    result.getParcelableExtra<OpenPgpError>(OpenPgpApi.RESULT_ERROR)
-                                Log.e(TAG, "error checking OpenPgp permissions: $error")
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    R.string.error_getting_openpgp_permission,
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                finish()
-                            }
-                        }
-                    }
-                })
-        openPgpServiceConnection = conn
-        app.openPgpServiceConnection = conn
-        conn.bindToService()
-    }
-
-    private fun onOpenPgpConnected() {
-        Log.d(TAG, "onOpenPgpConnected()")
-        navController.popBackStack(R.id.checkOpenKeychainFragment, true)
-        nextOnboardingScreen(R.id.checkOpenKeychainFragment)
-    }
-
     override fun onStop() {
         super.onStop()
         Log.d(TAG, "onStop()")
-    }
-
-    companion object {
-        private const val REQUEST_CODE_PERMISSION = 848
     }
 }

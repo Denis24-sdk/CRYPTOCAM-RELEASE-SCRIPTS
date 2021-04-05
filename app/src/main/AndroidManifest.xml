@@ -26,11 +26,17 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cryptocam" android:host="import_key"/>
+            </intent-filter>
         </activity>
         <service
             android:name="com.tnibler.cryptocam.RecordingService"
             android:foregroundServiceType="camera|microphone">
-            <!--        <service android:name="RecordingService">-->
 
         </service>
         <meta-data

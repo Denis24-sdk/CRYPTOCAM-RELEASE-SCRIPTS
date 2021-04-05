@@ -1,36 +1,19 @@
 <resources>
-    <string name="app_name">Cryptocam</string>
-    <string name="error_openpgp_connection">Connection to OpenPGP service failed. Is OpenKeychain installed?</string>
-    <string name="error_openpgp_permission">Cryptocam needs OpenPgp access to function</string>
-    <string name="error_getting_openpgp_permission">Error checking OpenPgp permissions</string>
-    <string name="select_one_key">Select at least one key</string>
+    <string name="app_name" translatable="false">Cryptocam</string>
     <string name="error_picking_directory">Error picking directory</string>
     <string name="pref_output_directory">Set output directory</string>
     <string name="choose_output_directory">Choose output directory</string>
     <string name="pick_out_dir_desc">Create and pick a directory where encrypted files will be saved.</string>
     <string name="open_file_picker">Open file picker</string>
-    <string name="choose_openpgp_key">Choose OpenPgp key</string>
-    <string name="pick_key_desc">Pick a key from OpenKeychain. The public key will be used to encrypt the recorded videos, and the corresponding private key allows you to decrypt them.</string>
-    <string name="pick_key_warning">Caution: the private key should not be on this device!</string>
-    <string name="open_openkeychain">Open OpenKeychain</string>
-    <string name="get_it_from_f_droid">Get it from F-Droid</string>
-    <string name="install_openkeychain_desc">OpenKeychain is required to encrypt recorded media with public key cryptography.</string>
-    <string name="install_openkeychain">Install OpenKeychain</string>
-    <string name="connecting_to_openkeychain">Connecting to OpenKeychain...</string>
-    <string name="try_again">Try again</string>
+    <string name="pick_key_desc">To use Cryptocam, you need to import a public key from the Companion App by scanning its QR code.</string>
     <string name="pref_output_directory_summary">Encrypted videos will be stored here</string>
-    <string name="pref_pgp_key">Choose OpenPGP key</string>
-    <string name="pref_pgp_key_summary">Videos will be encrypted using this key. Multiple keys are possible.</string>
-    <string name="error_openkeychain_permissions">Error getting OpenKeychain Permissions</string>
     <string name="video_framerate">Video framerate</string>
-    <string name="pick_key_something_went_wrong">Something went wrong. Please pick at least one key.</string>
-    <string name="error_encrypting">Failed to encrypt file. Make sure you\'ve selected a valid key.</string>
     <string name="video_resolution">Video resolution</string>
     <string name="video_resolution_summary">%s (Not all resolutions may be supported)</string>
     <string name="actual_recording_resolution">Actual recording resolution: %s</string>
     <string name="enable_overlay">Enable overlay</string>
-    <string name="enable_overlay_summary">Let others around you know that your recordings are safely encrypted</string>
-    <string name="record_on_start">Automatically start recording</string>
+    <string name="enable_overlay_summary">Let others around you know that your recordings are safely encrypted.</string>
+    <string name="record_on_start">Record on start</string>
     <string name="record_on_start_summary">Video recording will start as soon as the app opens.</string>
     <string name="recording_in_background">Recording in the background</string>
     <string name="background_recording_desc">Cryptocam supports recording in the background. That means recording will continue even if you exit the app or turn the screen off (!!!This does not work on Android 11 and up!!!).\nDepending on your device\'s manufacturer, Android might stop Cryptocam from running to save battery. To make sure that doesn\'t happen without you noticing, your device will regularly vibrate while recording. If the vibrating stops, it means Cryptocam was killed.</string>
@@ -42,7 +25,22 @@
     <string name="notification_title">Recording in the background</string>
     <string name="tutorial_website">Cryptocam tutorial site</string>
     <string name="tutorial_website_description">There is a full tutorial available on the Cryptocam website. It will explain how to generate keys, set them up in Cryptocam and how to decrypt videos.</string>
-    <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io">Go to tutorial</a></string>
     <string name="licenses">Licenses</string>
     <string name="licenses_description">Image and library licenses</string>
+    <string name="title_keys">My keys</string>
+    <string name="key_list_desc">Every checked key will be able to decrypt files. To add a new key, scan a qr code from the companion app.</string>
+    <string name="qr_scan_fail">Failed to import key. Try scanning again.</string>
+    <string name="import_key_fail">Failed to import key. Maybe it already exists?</string>
+    <string name="save_key">Save key</string>
+    <string name="fingerprint">Fingerprint:</string>
+    <string name="name_empty_error">Name can\'t be empty</string>
+    <string name="import_key">Import key</string>
+    <string name="scan_qrcode">Scan QR code</string>
+    <string name="pref_keys">Keys</string>
+    <string name="pref_keys_summary">Manage keys used to encrypt files</string>
+    <string name="must_select_one_key">You must select at least one key.</string>
+    <string name="no_key_selected">No key selected! Check at least one key in settings.</string>
+    <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io">Go to tutorial</a></string>
+    <string name="open_tutorial_site">Visit tutorial site</string>
+    <string name="tutorial_url">https://cryptocam.gitlab.io/</string>
 </resources>

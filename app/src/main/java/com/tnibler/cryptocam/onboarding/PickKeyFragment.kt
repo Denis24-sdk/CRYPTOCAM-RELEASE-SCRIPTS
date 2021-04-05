@@ -1,68 +1,57 @@
 package com.tnibler.cryptocam.onboarding
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.ActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.edit
-import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
-import androidx.preference.PreferenceManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.addRepeatingJob
 import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.PickKeyBinding
-import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.keys.EditKeyDialog
+import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.keys.ScannerKey
+import com.zhuinden.simplestackextensions.fragments.KeyedFragment
+import com.zhuinden.simplestackextensions.fragmentsktx.backstack
+import com.zhuinden.simplestackextensions.fragmentsktx.lookup
+import kotlinx.coroutines.flow.collect
 
-class PickKeyFragment : Fragment() {
-    lateinit var binding: PickKeyBinding
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        binding = PickKeyBinding.inflate(inflater, container, false)
-        return binding.root
-    }
-
-    private val chooseKeyActivityResult =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            chooseKeyResultListener?.invoke(result)
-        }
-
-    // gross, but we have to register all activity result listeners now so we can't
-    private var chooseKeyResultListener: ((ActivityResult) -> Unit)? = null
-    private fun setChooseKeyResultListener(listener: (ActivityResult) -> Unit) {
-        chooseKeyResultListener = listener
-    }
-
+class PickKeyFragment : KeyedFragment(R.layout.pick_key) {
+    private val viewModel: PickKeyViewModel by lazy { lookup() }
+    private val keyManager: KeyManager by lazy { lookup() }
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        lifecycleScope.launchWhenResumed {
-        }
-        binding.pickKeyButton.setOnClickListener {
-            (requireActivity() as MainActivity).openPgpKeyManager.chooseKey(
-                chooseKeyActivityResult,
-                ::setChooseKeyResultListener
-            ) { ok, keyIds ->
-                if (!ok) {
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.pick_key_something_went_wrong),
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    PreferenceManager.getDefaultSharedPreferences(requireContext()).edit {
-                        putStringSet(
-                            SettingsFragment.PREF_OPENPGP_KEYIDS,
-                            keyIds.map { it.toString() }.toSet()
-                        )
+        val binding = PickKeyBinding.bind(view)
+        with(binding) {
+            pickKeyButton.setOnClickListener {
+                backstack.goTo(ScannerKey())
+            }
+            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.STARTED) {
+                viewModel.keyScanned.collect { recipient ->
+                    val dialog = EditKeyDialog(recipient) { recipient ->
+                        val success = keyManager.importRecipient(recipient)
+                        if (!success) {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.import_key_fail),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            goNext()
+                        }
                     }
-                    (requireActivity() as MainActivity).nextOnboardingScreen(R.id.pickKeyFragment)
+                    dialog.show(this@PickKeyFragment.childFragmentManager, null)
+                }
+                keyManager.availableKeys.collect { keys ->
+                    if (keys.isNotEmpty()) {
+                        goNext()
+                    }
                 }
             }
         }
+    }
+
+    private fun goNext() {
+        (requireActivity() as MainActivity).nextOnboardingScreen(getKey())
     }
 }

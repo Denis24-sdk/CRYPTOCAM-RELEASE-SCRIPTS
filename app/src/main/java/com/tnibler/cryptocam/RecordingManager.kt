@@ -5,7 +5,6 @@ import android.os.HandlerThread
 import android.util.Log
 import androidx.camera.core.EncodedBufferHandler
 import androidx.camera.core.VideoStreamCapture
-import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -14,8 +13,8 @@ import java.util.concurrent.Executor
 class RecordingManager(
     val cameraSettings: CameraSettings,
     private val videoCapture: VideoStreamCapture,
-    private val videoInfo: VideoAudioMuxer.VideoInfo,
-    private val audioInfo: VideoAudioMuxer.AudioInfo,
+    private val videoInfo: VideoInfo,
+    private val audioInfo: AudioInfo,
     private val executor: Executor,
     private val coroutineScope: CoroutineScope,
     private val outputFileManager: OutputFileManager,
@@ -24,32 +23,23 @@ class RecordingManager(
     private val TAG = javaClass.simpleName
     var state: State = State.NOT_RECORDING
         private set
-    private val muxer = VideoAudioMuxer()
-    private val muxingThread = HandlerThread("MuxingThread").apply { start() }
-    private val muxingHandler = Handler(muxingThread.looper)
-    private var firstFrameTimestamp: Long = 0
+    private val encryptingThread = HandlerThread("EncryptingThread").apply { start() }
+    private val encryptingHandler = Handler(encryptingThread.looper)
     private var recordingStartMillis: Long = 0
+    private var videoFile: OutputFileManager.VideoFile? = null
 
     fun setUp() {
         Log.d(TAG, "setting up muxer")
-        firstFrameTimestamp = 0L
         videoCapture.setEncodedBufferHandler(object : EncodedBufferHandler {
             override fun audioBufferReady(data: ByteArray, presentationTimeUs: Long) {
-                if (firstFrameTimestamp == 0L) {
-                    firstFrameTimestamp = presentationTimeUs
-                }
-                muxingHandler.post {
-                    muxer.writeEncodedAudioBuffer(data, presentationTimeUs - firstFrameTimestamp)
+                encryptingHandler.post {
+                    videoFile?.writeAudioBuffer(data, presentationTimeUs)
                 }
             }
 
             override fun videoBufferReady(data: ByteArray, presentationTimeUs: Long) {
-                if (firstFrameTimestamp == 0L) {
-                    firstFrameTimestamp = presentationTimeUs
-                }
-                muxingHandler.post {
-                    muxer.writeEncodedVideoBuffer(data, presentationTimeUs - firstFrameTimestamp)
-                    videoPacketCallback?.invoke()
+                encryptingHandler.post {
+                    videoFile?.writeVideoBuffer(data, presentationTimeUs)
                 }
             }
 
@@ -60,7 +50,7 @@ class RecordingManager(
     }
 
     private fun onRecordingFinished() {
-        muxer.close()
+        videoFile?.close()
         Log.d(TAG, "muxer closed")
         coroutineScope.launch {
             setUp()
@@ -70,15 +60,14 @@ class RecordingManager(
     fun recordButtonClicked(): State {
         when (state) {
             State.NOT_RECORDING -> {
-                val encryptedFile = outputFileManager.newFile()
-
+                this.videoFile = outputFileManager.newVideoFile(videoInfo, audioInfo)
                 Log.d(TAG, "new file ready, setting up muxer")
-                muxer.setup(encryptedFile.fd, encryptedFile.key, videoInfo, audioInfo)
-                videoCapture.startRecording(executor, object : VideoStreamCapture.OnVideoSavedCallback {
-                    override fun onError(p0: Int, p1: String, p2: Throwable?) {
-                    }
-
-                })
+                videoCapture.startRecording(
+                    executor,
+                    object : VideoStreamCapture.OnVideoSavedCallback {
+                        override fun onError(p0: Int, p1: String, p2: Throwable?) {
+                        }
+                    })
                 recordingStartMillis = System.currentTimeMillis()
                 state = State.RECORDING
             }
@@ -99,3 +88,7 @@ class RecordingManager(
         NOT_RECORDING
     }
 }
+
+data class VideoInfo(val width: Int, val height: Int, val rotation: Int, val bitrate: Int)
+
+data class AudioInfo(val channelCount: Int, val bitrate: Int, val sampleRate: Int)

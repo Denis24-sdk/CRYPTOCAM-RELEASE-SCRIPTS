@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cryptocam</string>
+    <string name="error_picking_directory">Fehler beim Auswählen eines Ausgabeordners</string>
+    <string name="pref_output_directory">Speicherort ändern</string>
+    <string name="choose_output_directory">Speicherort auswählen</string>
+    <string name="pick_out_dir_desc">Wähle einen Ordner aus, in dem Aufnahmen gespeichert werden sollen.</string>
+    <string name="open_file_picker">Ordner wählen</string>
+    <string name="pick_key_desc">Um Cryptocam zu nutzen, muss ein öffentlicher Schlüssel importiert werden. Scanne dazu einen QR Code in der Companion App.</string>
+    <string name="pref_output_directory_summary">Hier werden verschlüsselte Aufnahmen gespeichert</string>
+    <string name="video_framerate">Videobildrate</string>
+    <string name="video_resolution">Videoauflösung</string>
+    <string name="video_resolution_summary">%s (evtl. werden nicht alle Auflösungen unterstützt)</string>
+    <string name="enable_overlay">Overlay aktivieren</string>
+    <string name="enable_overlay_summary">Lass Menschen um dich herum wissen, dass deine Aufnahmen verschlüsselt sind.</string>
+    <string name="record_on_start">Auto-Aufnahmestart</string>
+    <string name="record_on_start_summary">Videoaufzeichnung beginnt, sobald die App startet.</string>
+    <string name="recording_in_background">Im Hintergrund aufzeichnen</string>
+    <string name="background_recording_desc">Cryptocam kann auch im Hintergrund aufnehmen, wenn die App verlassen oder der Bildschirm gesperrt wird (!!!Nur bis Android 10!!!). Je nach Gerätehersteller kann es passieren, dass Android Cryptocam beended, um Akku zu sparen. Damit das auffällt, vibriert das Gerät regelmäßig während der Aufnahme. Hört das Vibrieren auf, wurde Cryptocam vom System beendet.</string>
+    <string name="vibrate_while_recording">Vibireren während der Aufnahme</string>
+    <string name="vibrate_while_recording_summary">Vibriere in regelmäßigen Abständen, wenn im Hintergrund aufgezeichnet wird. So fällt es auf, wenn Cryptocam beendet wird.</string>
+    <string name="notification_channel_description">Cryptocam zeichnet im Hintergrund auf.</string>
+    <string name="notification_channel_name">Aufzeichnung im Hintergrund</string>
+    <string name="notification_text">Aufnahme: %s</string>
+    <string name="notification_title">Aufzeichnung im Hintergrund</string>
+    <string name="tutorial_website_description">Auf der Cryptocam-Webseite ist eine komplette Anleitung verfügbar. Dort wird erklärt, wir Schlüssel generiert, diese in Cryptocam importiert werden sowie die Entschlüsselung von Videos.</string>
+    <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io/de">Anleitung öffnen</a></string>
+    <string name="licenses">Lizenzen</string>
+    <string name="licenses_description">Bild- und Librarylizenzen</string>
+    <string name="title_keys">Meine Schlüssel</string>
+    <string name="key_list_desc">Jeder ausgewählte Schlüssel kann Dateien entschlüsseln. Um einen neuen Schlüssel zu importieren, scanne einen QR Code aus der Companion App.</string>
+    <string name="qr_scan_fail">Fehler beim importieren. Versuche, erneut zu scannen.</string>
+    <string name="import_key_fail">Fehler beim importieren. Vielleicht existiert der Schlüssel schon?</string>
+    <string name="save_key">Schlüssel speichern</string>
+    <string name="fingerprint">Fingerprint:</string>
+    <string name="name_empty_error">Der Name darf nicht leer sein</string>
+    <string name="import_key">Schlüssel importieren</string>
+    <string name="scan_qrcode">QR Code scannen</string>
+    <string name="pref_keys">Schlüssel</string>
+    <string name="pref_keys_summary">Schlüssel verwalten</string>
+    <string name="must_select_one_key">Es muss mindestens ein Schlüssel ausgewählt sein.</string>
+    <string name="no_key_selected">Kein Schlüssel ausgewählt! Kreuze mindestens einen in den Einstellungen and.</string>
+    <string name="tutorial_website">Cryptocam-Anleitung</string>
+    <string name="actual_recording_resolution">Tatsächliche Auflösung: %s</string>
+    <string name="open_tutorial_site">Tutorial-Webseite öffnen</string>
+    <string name="tutorial_url">https://cryptocam.gitlab.io/de</string>
+</resources>

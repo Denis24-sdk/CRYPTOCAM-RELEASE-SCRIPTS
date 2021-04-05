@@ -4,29 +4,22 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
-import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.PickOutDirectoryBinding
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 
-class PickOutputDirFragment : Fragment() {
-    lateinit var binding: PickOutDirectoryBinding
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        binding = PickOutDirectoryBinding.inflate(inflater, container, false)
-        return binding.root
-    }
-
+class PickOutputDirFragment : KeyedFragment(R.layout.pick_out_directory) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.run {
+        val binding = PickOutDirectoryBinding.bind(view)
+        with(binding) {
             val openDocumentTree = object : ActivityResultContracts.OpenDocumentTree() {
                 override fun createIntent(context: Context, input: Uri?): Intent {
                     return super.createIntent(context, input)
@@ -43,7 +36,7 @@ class PickOutputDirFragment : Fragment() {
                 if (dir?.findFile(".nomedia") == null) {
                     dir?.createFile("asd/asd", ".nomedia")
                 }
-                (requireActivity() as MainActivity).nextOnboardingScreen(R.id.pickOutputDirFragment)
+                (requireActivity() as MainActivity).nextOnboardingScreen(getKey())
             }
             pickOutDirButton.setOnClickListener {
                 pickOutputDir.launch(null)

@@ -1,0 +1,67 @@
+image: jangrewe/gitlab-ci-android
+
+cache:
+  key: ${CI_PROJECT_ID}
+  paths:
+    - .gradle/
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9][0-9\.]*$/i'
+      when: always
+    - when: never
+
+variables:
+  ANDROID_COMPILE_SDK: "30"
+  ANDROID_BUILD_TOOLS: "29.0.3"
+  ANDROID_SDK_TOOLS:   "6858069"
+  ANDROID_COMPILE_NDK: "22.1.7171670"
+
+before_script:
+  - curl https://dl.google.com/go/go1.16.3.linux-amd64.tar.gz | tar xz -C /usr/local
+  - ln -s /usr/local/go/bin/go /usr/sbin/go
+  - go version
+  - apt-get --quiet update --yes
+  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}"
+  - sdkmanager "ndk;${ANDROID_COMPILE_NDK}"
+  - sdkmanager "platform-tools"
+  - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}"
+  - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_COMPILE_NDK
+  - export GRADLE_USER_HOME=$(pwd)/.gradle
+  - chmod +x ./gradlew
+
+  - go get golang.org/x/mobile/cmd/gomobile
+  - go get golang.org/x/mobile/cmd/gobind
+  - export PATH=~/go/bin:$PATH
+
+stages:
+  - build
+  - release
+
+assembleRelease:
+  stage: build
+  script:
+    - mkdir app/libs
+    - cd age-encryption
+    - ~/go/bin/gomobile init
+    - ~/go/bin/gomobile bind -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
+    - cd ..
+    - ./gradlew assembleRelease
+    - mv app/build/outputs/apk/release/app-release-unsigned.apk cryptocam-$CI_COMMIT_TAG.apk
+  artifacts:
+    paths:
+      - cryptocam-$CI_COMMIT_TAG.apk
+
+release:
+  stage: release
+  except:
+    - branches
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: assembleRelease
+      artifacts: true
+
+  script:
+    - |
+      release-cli create --name "Release $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+        --assets-link "{\"name\":\"APK Download (Unsigned)\",\"url\":\"https://gitlab.com/cryptocam/cryptocam/-/jobs/$CI_JOB_ID/artifacts/raw/cryptocam-$CI_COMMIT_TAG.apk?inline=false\"}" \

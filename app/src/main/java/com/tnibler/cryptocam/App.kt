@@ -5,14 +5,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
-import org.openintents.openpgp.util.OpenPgpApi
-import org.openintents.openpgp.util.OpenPgpServiceConnection
+import com.zhuinden.simplestack.GlobalServices
+import com.zhuinden.simplestackextensions.servicesktx.add
 
 class App : Application() {
-    var openPgpServiceConnection: OpenPgpServiceConnection? = null
-    var openPgpApi: OpenPgpApi? = null
     var startedRecordingOnLaunch = false
+    lateinit var globalServices: GlobalServices
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -32,11 +33,11 @@ class App : Application() {
         if (!sharedPreferences.getBoolean(SettingsFragment.PREF_RECORD_ON_START, false)) {
             startedRecordingOnLaunch = true
         }
-    }
 
-    override fun onTerminate() {
-        super.onTerminate()
-        openPgpServiceConnection?.unbindFromService()
+        val keyManager = KeyManager(this, sharedPreferences)
+        globalServices = GlobalServices.builder()
+            .add(keyManager)
+            .build()
     }
 
     companion object {

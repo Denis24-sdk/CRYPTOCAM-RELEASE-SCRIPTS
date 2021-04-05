@@ -24,8 +24,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
-import com.tnibler.cryptocam.videoProcessing.VideoAudioMuxer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,7 +65,7 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
-    private lateinit var openPgpKeyManager: OpenPgpManager
+    private var recipients: Collection<KeyManager.X25519Recipient> = setOf()
     private var outputFileManager: OutputFileManager? = null
     private var recordingManager: RecordingManager? = null
     private val _state: MutableStateFlow<State> =
@@ -123,14 +123,6 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
-    fun initOpenPgp(openPgpKeyManager: OpenPgpManager) {
-        Log.d(TAG, "initOpenPgp()")
-        this.openPgpKeyManager = openPgpKeyManager
-        if (cameraProvider == null) {
-            initCamera()
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "onCreate()")
@@ -141,6 +133,7 @@ class RecordingService : Service(), LifecycleOwner {
 
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         orientationEventListener.enable()
+
     }
 
     override fun onDestroy() {
@@ -153,6 +146,13 @@ class RecordingService : Service(), LifecycleOwner {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand()")
         return START_REDELIVER_INTENT
+    }
+
+    fun init(recipients: Collection<KeyManager.X25519Recipient>) {
+        this.recipients = recipients
+        if (cameraProvider == null) {
+            initCamera()
+        }
     }
 
     fun toggleRecording() {
@@ -314,13 +314,8 @@ class RecordingService : Service(), LifecycleOwner {
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         val outputLocation =
             sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
-        val keyIds = sharedPreferences.getStringSet(SettingsFragment.PREF_OPENPGP_KEYIDS, setOf())
-            ?.map { it.toLong() }
-        if (keyIds == null) {
-            debugToast("keyIds is null in initRecording")
-            return
-        } else if (keyIds.isEmpty()) {
-            debugToast("keyIds is empty in initRecording")
+        if (recipients.isEmpty()) {
+            debugToast(getString(R.string.no_key_selected))
             return
         }
         val actualRes = videoCapture?.attachedSurfaceResolution
@@ -340,9 +335,8 @@ class RecordingService : Service(), LifecycleOwner {
         val orientation = lastHandledOrientation
 
         Log.d(TAG, "Orientation: $orientation")
-        val videoInfo = VideoAudioMuxer.VideoInfo(
+        val videoInfo = VideoInfo(
             bitrate = cameraSettings.bitrate,
-            framerate = cameraSettings.frameRate,
             height = height,
             width = width,
             rotation = when (orientation) {
@@ -353,17 +347,16 @@ class RecordingService : Service(), LifecycleOwner {
         )
         Log.d(TAG, "VideoInfo: $videoInfo")
         val videoCapture = checkNotNull(videoCapture)
-        val audioInfo = VideoAudioMuxer.AudioInfo(
+        val audioInfo = AudioInfo(
             bitrate = videoCapture.audioBitRate,
             sampleRate = videoCapture.audioSampleRate,
             channelCount = videoCapture.audioChannelCount
         )
         outputFileManager = OutputFileManager(
-            openPgpManager = openPgpKeyManager,
             outputLocation = Uri.parse(outputLocation),
-            keyIds = keyIds,
             contentResolver = contentResolver,
-            context = this
+            context = this,
+            recipients = recipients
         )
         val shouldVibrate =
             sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_WHILE_RECORDING, true)

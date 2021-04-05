@@ -6,20 +6,16 @@ https://github.com/PapirusDevelopmentTeam/
 Key icon by Smashicons:
 https://www.flaticon.com/authors/smashicons
 
-OpenKeychain Icon:
-https://github.com/open-keychain/open-keychain
-
 ===Library licenses===
-
-OpenPgp-Api (Apache license v2):
-https://github.com/open-keychain/openpgp-api
 
 WhatTheStack (Apache license v2):
 https://github.com/haroldadmin/WhatTheStack
 
-FFmpeg (LGPL 2.1):
-https://ffmpeg.org/
+age (BSD 3-Clause):
+https://github.com/FiloSottile/age
 
-ffmpeg-android-maker (MIT License):
-https://github.com/Javernaut/ffmpeg-android-maker
+Code scanner (MIT license):
+https://github.com/yuriy-budiyev/code-scanner
 
+Apache Commons Coded (Apache license v2):
+http://commons.apache.org/proper/commons-codec/

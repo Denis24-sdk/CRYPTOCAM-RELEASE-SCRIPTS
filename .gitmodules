@@ -1,6 +1,0 @@
-[submodule "ffmpeg-android-maker"]
-	path = ffmpeg-android-maker
-	url = https://github.com/Javernaut/ffmpeg-android-maker
-[submodule "androidx-build"]
-	path = androidx-build
-	url = git@gitlab.com:tnibler/cryptocam-androidx-build.git

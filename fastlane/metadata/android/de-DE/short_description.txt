@@ -1,1 +1,1 @@
-Verschlüsselnde Kamera-App mittel OpenPGP
+Schützt sensible Aufnahmen, indem sie live verschlüsselt werden

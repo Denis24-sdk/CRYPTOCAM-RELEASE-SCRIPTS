@@ -3,52 +3,143 @@ package com.tnibler.cryptocam
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.tnibler.cryptocam.keys.KeyManager
+import cryptocam_age_encryption.Cryptocam_age_encryption
+import cryptocam_age_encryption.EncryptedWriter
 import org.json.JSONObject
-import java.math.BigInteger
+import java.io.OutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
-import javax.crypto.KeyGenerator
-import kotlin.random.Random
 
-// TODO only create new file if previous was actually used
-class OutputFileManager(private val openPgpManager: OpenPgpManager, var outputLocation: Uri, var keyIds: Collection<Long>, private val contentResolver: ContentResolver, private val context: Context) {
+class OutputFileManager(
+    var outputLocation: Uri,
+    var recipients: Collection<KeyManager.X25519Recipient>,
+    private val contentResolver: ContentResolver,
+    private val context: Context
+) {
     private val TAG = javaClass.simpleName
-    private var currentFile: EncryptedVideoFile? = null
-    private var currentFileName: String? = null
-    /**
-     * Creates new file to record video into, along with an AES-128 key used to encrypt the media streams.
-     */
-    fun newFile(): EncryptedVideoFile {
-        val out = DocumentFile.fromTreeUri(context, outputLocation) ?: throw RuntimeException("Error opening output directory")
+
+    fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFile {
+        val out = DocumentFile.fromTreeUri(context, outputLocation)
+            ?: throw RuntimeException("Error opening output directory")
         val filename = randomFilename()
-        val keyFile = out.createFile("application/text", "$filename.pgp") ?: throw RuntimeException("Error creating keyfile")
-        val keyOut = contentResolver.openOutputStream(keyFile.uri) ?: throw RuntimeException("Error opening keyfile for writing")
-        val key = keyGen.generateKey()
-        val json = JSONObject()
-        val hexKey = String.format("%032X", BigInteger(+1, key.encoded))
-        json.put("timestamp", dateTime())
-        json.put("encryptionKey",  hexKey)
 
-        openPgpManager.encryptText(json.toString(), keyOut, keyIds)
+        val metadata = buildVideoMetadata(videoInfo, audioInfo)
 
-        val outFile = out.createFile("video/mp4", "$filename.mp4") ?: throw RuntimeException("Error creating output file")
-        val outFd = contentResolver.openFileDescriptor(outFile.uri, "rwt", null)?.detachFd() ?: throw RuntimeException("Error opening file descriptor")
-        val file = EncryptedVideoFile(hexKey, outFd)
-        currentFile = file
-        currentFileName = filename
-        Log.d(TAG, "new file: $filename")
-        return file
+        val outFile = out.createFile("application/binary", "$filename.cryptocam.age")
+            ?: throw RuntimeException("Error creating output file")
+        val outStream = contentResolver.openOutputStream(outFile.uri)
+            ?: throw RuntimeException("Error opening output file")
+        writePlainTextHeader(outStream)
+        outStream.close()
+
+        val outFd = contentResolver.openFileDescriptor(outFile.uri, "rwa", null)?.detachFd()
+            ?: throw RuntimeException("Error opening file descriptor")
+        val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
+        val encryptedWriter = Cryptocam_age_encryption.createWriterWithX25519Recipients(
+            outFd.toLong(),
+            recipientsConcat
+        )
+        val ef = EncryptedFile(encryptedWriter)
+        writeHeader(ef, metadata.size)
+        ef.write(metadata)
+        return VideoFile(ef)
     }
+
+    private fun writePlainTextHeader(out: OutputStream) {
+        val bb = ByteBuffer.allocate(4 + 2 + 1)
+
+        bb.order(ByteOrder.BIG_ENDIAN)
+        // magic number
+        bb.put(byteArrayOfInts(0x1c, 0x5a, 0x8e, 0x9f))
+        bb.order(ByteOrder.LITTLE_ENDIAN)
+        // version
+        bb.putShort(1)
+        if (recipients.size > 20) {
+            throw IllegalStateException("more than 20 age recipients are not possible")
+        }
+        bb.put(recipients.size.toByte())
+        out.write(bb.array())
+        recipients.forEach { recipient ->
+            out.write(recipient.fingerprint)
+        }
+    }
+
+    private fun writeHeader(encryptedFile: EncryptedFile, metadataSize: Int) {
+        val bb = ByteBuffer.allocate(1 + 4)
+        bb.order(ByteOrder.LITTLE_ENDIAN)
+        // file type: only video for now
+        bb.put(1)
+        // offset to data
+        val offsetToData: Int = bb.capacity() + metadataSize
+        // this is a signed int but we're just going to assume we're not writing 2GB of metadata
+        bb.putInt(offsetToData)
+        encryptedFile.write(bb.array())
+    }
+
+    private fun buildVideoMetadata(videoInfo: VideoInfo, audioInfo: AudioInfo): ByteArray {
+        val json = JSONObject()
+        json.put("timestamp", dateTime())
+        json.put("width", videoInfo.width)
+        json.put("height", videoInfo.height)
+        json.put("rotation", videoInfo.rotation)
+        json.put("video_bitrate", videoInfo.bitrate)
+        json.put("audio_sample_rate", audioInfo.sampleRate)
+        json.put("audio_channel_count", audioInfo.channelCount)
+        json.put("audio_bitrate", audioInfo.bitrate)
+        return json.toString().toByteArray()
+    }
+
+    private fun byteArrayOfInts(vararg values: Int): ByteArray =
+        values.map { it.toByte() }.toTypedArray().toByteArray()
 
     private val dateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME
     private fun dateTime() = dateTimeFormatter.format(LocalDateTime.now())
 
-    private val random = Random(System.currentTimeMillis())
     private fun randomFilename(): String = UUID.randomUUID().toString()
-    private val keyGen = KeyGenerator.getInstance("AES")
 
-    data class EncryptedVideoFile(val key: String, val fd: Int)
+    class EncryptedFile(private val encryptedWriter: EncryptedWriter) {
+        fun write(buffer: ByteArray) {
+            var written = 0L
+            while (written < buffer.size) {
+                written += encryptedWriter.write(buffer)
+            }
+        }
+
+        fun close() {
+            encryptedWriter.close()
+        }
+    }
+
+    class VideoFile(private val encryptedFile: EncryptedFile) {
+
+        fun writeVideoBuffer(data: ByteArray, presentationTimeStampUs: Long) {
+            val bb = ByteBuffer.allocate(1 + 8 + 4)
+            bb.order(ByteOrder.LITTLE_ENDIAN)
+            bb.put(1)
+            bb.putLong(presentationTimeStampUs)
+            bb.putInt(data.size)
+            encryptedFile.write(bb.array())
+            encryptedFile.write(data)
+        }
+
+
+        fun writeAudioBuffer(data: ByteArray, presentationTimeStampUs: Long) {
+            val bb = ByteBuffer.allocate(1 + 8 + 4)
+            bb.order(ByteOrder.LITTLE_ENDIAN)
+            bb.put(2)
+            bb.putLong(presentationTimeStampUs)
+            bb.putInt(data.size)
+            encryptedFile.write(bb.array())
+            encryptedFile.write(data)
+        }
+
+        fun close() {
+            encryptedFile.close()
+        }
+    }
 }

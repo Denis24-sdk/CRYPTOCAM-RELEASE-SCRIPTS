@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
@@ -14,22 +12,12 @@ import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
+import com.tnibler.cryptocam.keys.KeysKey
+import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 
 class SettingsFragment : PreferenceFragmentCompat() {
     private val TAG = javaClass.simpleName
-
-    private val chooseKeyActivityResult =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            chooseKeyResultListener?.invoke(result)
-        }
-
-    // gross, but we have to register all activity result listeners now so we can't
-    private var chooseKeyResultListener: ((ActivityResult) -> Unit)? = null
-    private fun setChooseKeyResultListener(listener: (ActivityResult) -> Unit) {
-        chooseKeyResultListener = listener
-    }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val context = preferenceManager.context
@@ -67,29 +55,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
         screen.addPreference(outputDirPreference)
 
         val keyPreference = Preference(context)
-        keyPreference.key =
-            PREF_OPENPGP_KEYIDS
-        keyPreference.title = getString(R.string.pref_pgp_key)
-        keyPreference.summary = getString(R.string.pref_pgp_key_summary)
+        keyPreference.key = PREF_SELECTED_RECIPIENTS
+        keyPreference.title = getString(R.string.pref_keys)
+        keyPreference.summary = getString(R.string.pref_keys_summary)
         keyPreference.setIcon(R.drawable.ic_key)
         keyPreference.setOnPreferenceClickListener {
-            val mainActivity = (requireActivity() as MainActivity)
-            mainActivity.openPgpKeyManager.chooseKey(
-                chooseKeyActivityResult,
-                ::setChooseKeyResultListener
-            ) { ok, keyIds ->
-                if (!ok) {
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.pick_key_something_went_wrong),
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    preferenceManager.sharedPreferences.edit {
-                        putStringSet(PREF_OPENPGP_KEYIDS, keyIds.map { it.toString() }.toSet())
-                    }
-                }
-            }
+            backstack.goTo(KeysKey())
             true
         }
         screen.addPreference(keyPreference)
@@ -154,12 +125,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         screen.addPreference(vibrateWhileRecordingPreference)
 
+        val tutorialPreference = Preference(context)
+        tutorialPreference.key = "tutorial"
+        tutorialPreference.title = getString(R.string.open_tutorial_site)
+//        tutorialPreference.summary = getString(R.string.tutorial_description)
+        tutorialPreference.setOnPreferenceClickListener {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse(getString(R.string.tutorial_url))
+            }
+            startActivity(intent)
+            true
+        }
+        screen.addPreference(tutorialPreference)
+
         val licensePreference = Preference(context)
         licensePreference.key = "licenses"
         licensePreference.title = getString(R.string.licenses)
         licensePreference.summary = getString(R.string.licenses_description)
         licensePreference.setOnPreferenceClickListener {
-            findNavController().navigate(R.id.licensesFragment)
+            backstack.goTo(LicensesKey())
             true
         }
         screen.addPreference(licensePreference)
@@ -170,12 +154,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
     companion object {
         private const val REQUEST_PICK_DIRECTORY = 8735
         const val PREF_OUTPUT_DIRECTORY = "mediaOutputLocation"
-        const val PREF_OPENPGP_KEYIDS = "openPgpKeyId"
         const val PREF_FRAMERATE = "videoFramerate"
         const val PREF_VIDEO_RESOLUTION = "videoResolution"
         const val PREF_OVERLAY = "enableOverlay"
         const val PREF_RECORD_ON_START = "recordOnStart"
         const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
+        const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
 
         const val SHOWED_BACKGROUND_RECORDING_INFO = "showedBackgroundRecordingInfo"
         const val SHOWED_TUTORIAL_INFO = "showedWebsiteTutorialInfo"

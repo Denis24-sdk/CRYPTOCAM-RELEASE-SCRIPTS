@@ -1,11 +1,16 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-if [ -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavformat.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavutil.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libavcodec.so" -a -f "ffmpeg-android-maker/output/lib/armeabi-v7a/libswscale.so" ]; then
-	echo "ffmpeg already built"
-else
-	echo "rebuilding ffmpeg"
-	./ffmpeg-android-maker/ffmpeg-android-maker.sh
-fi
+###
+# This script compiles the needed go libraries into Android AAR files.
+# Requirements: go, gobind, gomobile
+#
+# ANDROID_HOME and ANDROID_NDK_HOME have to be set to the correct paths
+# to use this script
+# The native libraries only need to built once.
+# Afterwards, you can build the app with ./gradlew assembleDebug as usual
+###
 
-gradle wrapper
+cd age-encryption
+gomobile bind -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
+cd ..
 ./gradlew assembleDebug

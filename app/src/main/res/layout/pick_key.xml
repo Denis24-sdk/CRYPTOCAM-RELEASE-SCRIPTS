@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_height="match_parent"
     android:layout_width="match_parent"
-    android:background="#6DA048"
+    android:background="@color/colorPrimary"
     android:orientation="vertical"
     android:weightSum="1">
 
@@ -25,9 +25,8 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="32dp"
                 android:fontFamily="@font/basic"
-                android:text="@string/choose_openpgp_key"
-                android:textColor="#fff"
-                android:textSize="48sp" />
+                android:text="@string/import_key"
+                style="@style/titleStyle" />
 
             <ImageView
                 android:id="@+id/pickKeyImage"
@@ -44,22 +43,8 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="32dp"
                 android:layout_marginBottom="16dp"
-                android:textColor="#fff"
                 android:text="@string/pick_key_desc"
-                android:textSize="20sp" />
-
-            <TextView
-                android:id="@+id/pickKeyWarning"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="32dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="32dp"
-                android:background="#d00"
-                android:gravity="center"
-                android:text="@string/pick_key_warning"
-                android:textColor="#fff"
-                android:textSize="24sp" />
+                style="@style/longTextStyle" />
 
         </LinearLayout>
 
@@ -76,6 +61,6 @@
         android:drawableEnd="@drawable/ic_arrow_forward"
         android:textColor="#fff"
         android:textSize="18sp"
-        android:text="@string/open_openkeychain" />
+        android:text="@string/scan_qrcode" />
 
 </LinearLayout>
