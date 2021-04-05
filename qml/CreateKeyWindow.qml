@@ -2,17 +2,16 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtQuick.Layouts 1.15
-import QtQuick.Dialogs 1.2
+import QtQuick.Dialogs 1.3
 
 ApplicationWindow {
+    id: createKeyWindow
     height: 400
     width: 500
     modality: "ApplicationModal"
     title: "Create key"
 
-    function onCreateKeyClicked(name, email, comment, passphrase, passphraseConfirm) {
-        console.log("Base function")
-    }
+    signal keyCreated(string name, string passphrase, string passphraseConfirm)
 
     GridLayout {
         anchors.fill: parent
@@ -20,35 +19,12 @@ ApplicationWindow {
         columns: 2
 
         Label {
-            text: "Name"
+            text: "Key name"
             Layout.alignment: Qt.AlignLeft
         }
 
         TextField {
             id: textFieldName
-            Layout.fillWidth: true
-            selectByMouse: true
-        }
-
-        Label {
-            text: "Email"
-            Layout.alignment: Qt.AlignLeft
-        }
-
-        TextField {
-            id: textFieldEmail
-            Layout.fillWidth: true
-            text: "email@email.com"
-            selectByMouse: true
-        }
-
-        Label {
-            text: "Comment"
-            Layout.alignment: Qt.AlignLeft
-        }
-
-        TextField {
-            id: textFieldComment
             Layout.fillWidth: true
             selectByMouse: true
         }
@@ -60,6 +36,7 @@ ApplicationWindow {
         TextField {
             id: textFieldPassphrase
             echoMode: TextInput.Password
+            selectByMouse: true
             Layout.fillWidth: true
             onTextChanged: {
                 labelPassphraseError.visible = false
@@ -73,6 +50,7 @@ ApplicationWindow {
         TextField {
             id: textFieldRepeatPassphrase
             echoMode: TextInput.Password
+            selectByMouse: true
             Layout.fillWidth: true
             onTextChanged: {
                 labelPassphraseError.visible = false
@@ -85,25 +63,20 @@ ApplicationWindow {
             visible: false
         }
 
-        Label {
-            text: "Key type: ED25519"
-        }
-
-        Item {}
-
-        Label {
-            id: labelEntropy
-            text: "If this takes long, try moving the mouse around to generate entropy."
-            visible: false
-        }
-
         Button {
             id: buttonCreateKey
             text: "Create key"
             onClicked: {
+
                 let passphrase = textFieldPassphrase.text
                 let passphraseConfirm = textFieldRepeatPassphrase.text
-                if (passphrase == "") {
+                let name = textFieldName.text
+                if (!name) {
+                    labelPassphraseError.visible = true
+                    labelPassphraseError.text = "Name can't be emtpy."
+                    return
+                }
+                if (passphrase === "") {
                     labelPassphraseError.visible = true
                     labelPassphraseError.text = "Passphrase can't be emtpy."
                     return
@@ -114,13 +87,8 @@ ApplicationWindow {
                     labelPassphraseError.text = "Passphrases don't match."
                     return
                 }
-                let name = textFieldName.text
-                let comment = textFieldComment.text
-                let email = textFieldEmail.text
-                labelEntropy.visible = true
-                onCreateKeyClicked(name, email, comment, passphrase, passphraseConfirm)
                 createKeyWindow.close()
-                textFieldComment.clear()
+                createKeyWindow.keyCreated(name, passphrase, passphraseConfirm)
                 textFieldName.clear()
                 textFieldPassphrase.clear()
                 textFieldRepeatPassphrase.clear()

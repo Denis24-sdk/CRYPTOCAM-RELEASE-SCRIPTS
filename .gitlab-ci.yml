@@ -1,33 +1,57 @@
-# this image uses ubuntu 18.04 which doesn't have python3.9 or newer QML packages.
-# I've tried just doing the steps from the appimage-builder Dockerfile in here, but
-# that breaks the appimage-builder build for some reason (even though it works in a
-# Dockerfile with newer Ubuntu). That's why we're doing the python backport ppa stuff here.
 stages:
-    - build
+    - build_binary
+    - build_appimage
     - release
-build_appimage_amd64:
-    stage: build
-    only:
-        - /^v[0-9][0-9\.]*[a-zA-Z\-]*$/i
-    except:
-        - branches
 
-    image: appimagecrafters/appimage-builder:latest
+workflow:
+    rules:
+        - if: '$CI_COMMIT_TAG =~ /^v[0-9][0-9\.]*$/i'
+          when: always
+        - when: never
 
+#build_all:
+#    stage: build
+#    only:
+#        - /^v[0-9][0-9\.]*[a-zA-Z\-]*$/i
+#    except:
+#        - branches
+#    needs: ["build_appimage_amd64", "build_linux_amd64"]
+#    script: echo "placeholder"
+
+build_linux_amd64:
+    stage: build_binary
+    image: ubuntu:hirsute
     before_script:
-        - apt-get install -y software-properties-common
-        - add-apt-repository ppa:deadsnakes/ppa
         - apt-get update
-        - DEBIAN_FRONTEND=noninteractive apt-get -y install jq python3.9 python3.9-distutils
-        # - DEBIAN_FRONTEND=noninteractive apt-get -y install python3.9-setuptools python3.9-pip pipenv wget fakeroot gnupg2 libglib2.0-bin file desktop-file-utils libgdk-pixbuf2.0-dev librsvg2-dev libyaml-dev zsync git jq
+        - DEBIAN_FRONTEND=noninteractive apt-get -y install cargo rustc ffmpeg libavformat-dev libavcodec-dev libswscale-dev libavutil-dev qt5-qmake g++ qtbase5-dev qtdeclarative5-dev qtquickcontrols2-5-dev
+        - ls -l /usr/include/
 
     script:
         - cd $CI_PROJECT_DIR
-        - jq --raw-output '.default | to_entries[] | .key + .value.version + (.value.hashes | map(" --hash=\(.)") | join(""))' Pipfile.lock > requirements.txt
+        - FFMPEG_INCLUDE_DIR=/usr/include/x86_64-linux-gnu FFMPEG_LIB_DIR=/usr/lib/x86_64-linux-gnu cargo build --release -j8
+        - cp target/release/cryptocam-qt .
+        - echo "LINUX_BINARY_LINK=https://gitlab.com/cryptocam/cryptocam-companion/-/jobs/$CI_JOB_ID/artifacts/raw/cryptocam-qt?inline=false" >> build.env
+    artifacts:
+        reports:
+            dotenv: build.env
+        paths:
+            - 'cryptocam-qt'
+        expire_in: 30 days
+
+build_appimage_amd64:
+    stage: build_appimage
+    needs: [ 'build_linux_amd64' ]
+
+    image: appimagecrafters/appimage-builder:latest
+    before_script:
+        - apt-get update -y
+        - apt-get install -y software-properties-common
+
+    script:
+        - cd $CI_PROJECT_DIR
         - appimage-builder --skip-tests
         - export APPIMAGE_NAME=$(find *.AppImage)
-
-        - echo "APPIMAGE_LINK=https://gitlab.com/tnibler/cryptocam-companion/-/jobs/$CI_JOB_ID/artifacts/raw/$APPIMAGE_NAME?inline=false" >> build.env
+        - echo "APPIMAGE_LINK=https://gitlab.com/cryptocam/cryptocam-companion/-/jobs/$CI_JOB_ID/artifacts/raw/$APPIMAGE_NAME?inline=false" >> build.env
     artifacts:
         reports:
             dotenv: build.env
@@ -35,10 +59,10 @@ build_appimage_amd64:
             - '*.AppImage'
         expire_in: 30 days
 
+
+
 release:
     stage: release
-    only:
-        - /^v[0-9][0-9\.]*$/i
     except:
         - branches
     image: registry.gitlab.com/gitlab-org/release-cli:latest
@@ -46,7 +70,12 @@ release:
     needs:
         - job: build_appimage_amd64
           artifacts: true
+        - job: build_linux_amd64
+          artifacts: true
     script:
         - |
           release-cli create --name "Release $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
-            --assets-link "{\"name\":\"Linux AppImage\",\"url\":\"$APPIMAGE_LINK\"}"
+            --assets-link "{\"name\":\"Linux x86_64\",\"url\":\"$LINUX_BINARY_LINK\"}" \
+            --assets-link "{\"name\":\"Linux x86_64 AppImage\",\"url\":\"$APPIMAGE_LINK\"}"
+
+

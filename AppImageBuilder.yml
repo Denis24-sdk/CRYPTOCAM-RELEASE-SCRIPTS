@@ -2,26 +2,21 @@ version: 1
 script:
   - rm -rf AppDir  | true
   # Make usr and icons dirs
-  - mkdir -p AppDir/usr/src AppDir/usr/share/icons
-  # Copy the python application code into the AppDir
-  - cp src/* AppDir/usr/src -r
+  - mkdir -p AppDir/usr/src/cryptocam-qt AppDir/usr/share/icons AppDir/usr/bin
+  - cp src qml Cargo.toml AppDir/usr/src/cryptocam-qt/ -r
   - cp cryptocam-companion.svg AppDir/usr/share/icons
-  # Install application dependencies
-  - python3.9 -m pip install --upgrade pip
-  - python3.9 -m pip install --ignore-installed --prefix=/usr --root=AppDir -r ./requirements.txt
-  # - python3.9 -m pip install --ignore-installed --prefix=/usr --root=AppDir -r PyQt5
+  - cp cryptocam-qt AppDir/usr/bin/
 AppDir:
   path: ./AppDir
 
   app_info:
     id: com.tnibler.cryptocam-companion
-    name: CryptocamCompanion
+    name: Cryptocam Companion
     icon: cryptocam-companion
-    version: 0.1.3
-    # Set the python executable as entry point
-    exec: usr/bin/python3
+    version: 0.2.0
+    exec: usr/bin/cryptocam-qt
     # Set the application main script path as argument. Use '$@' to forward CLI parameters
-    exec_args: $APPDIR/usr/src/main.py $@
+    exec_args: $@
 
   apt:
     arch: amd64
@@ -30,30 +25,14 @@ AppDir:
         key_url: 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
 
     include:
-      - python3.9
-      - python3-pkg-resources
-      - python3-pyqt5
-      - python3-pyqt5.qtquick
       - qml-module-qtquick2
       - qml-module-qtquick-controls2
+      - qml-module-qtquick-controls
       - qml-module-qtquick-window2
       - qml-module-qtquick-layouts
       - qml-module-qtquick-dialogs
-      - qml-module-qt-labs-platform
-      - ffmpeg
-      - gnupg
 
     exclude: []
-
-  runtime:
-    env:
-      PATH: '${APPDIR}/usr/bin:${PATH}'
-      # Set python home
-      # See https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHOME
-      PYTHONHOME: '${APPDIR}/usr'
-      # Path to the site-packages dir or other modules dirs
-      # See https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH
-      PYTHONPATH: '${APPDIR}/usr/lib/python3.9/site-packages'
 
   test:
     fedora:

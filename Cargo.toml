@@ -1,0 +1,30 @@
+[package]
+name = "cryptocam-qt"
+version = "0.2.0"
+authors = ["Thomas Nibler <dev@tnibler.de>"]
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+qmetaobject = "0.1.4"
+cstr = "0.1.7"
+cpp = "0.5.6"
+libcryptocam = { git = "https://gitlab.com/cryptocam/libcryptocam", tag = "v0.1.1" }
+# libcryptocam = { path = "../libcryptocam" }
+anyhow = "1.0"
+
+url = "2.2.1"
+urlencoding = "1.1.1"
+hex = "0.4.3"
+lazy-init = "0.5.0"
+base64 = "0.13.0"
+threadpool = "1.8.1"
+
+rust-ini = "0.16.1"
+dirs-next = "2.0.0"
+
+[build-dependencies]
+cpp_build = "0.5.6"
+
