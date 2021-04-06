@@ -43,7 +43,7 @@ Please share your results on your device as well!
 
 ## Decrypting videos
 
-See either the [tutorial site](https://cryptocam.gitlab.io) for a detailed walkthrough or the README of the cli/graphical companion tool you chose.
+See either the [tutorial site](https://cryptocam.gitlab.io) for a detailed walkthrough or the README of the [cli](https://gitlab.com/cryptocam/cryptocam-companion-cli) or [graphical companion](https://gitlab.com/cryptocam/cryptocam-companion) tool you prefer to use.
 
 ## Building
 
