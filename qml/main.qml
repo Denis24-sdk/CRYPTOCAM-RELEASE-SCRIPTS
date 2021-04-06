@@ -52,7 +52,8 @@ ApplicationWindow {
     }
     Component {
         id: askPassphraseDialogComponent
-        Dialog {
+
+        ApplicationWindow {
             id: askPassphraseDialog
             visible: false
             modality: Qt.ApplicationModal
@@ -61,15 +62,10 @@ ApplicationWindow {
             height: 150
             property string keyName: ""
             property string error: ""
-            onAccepted: {
-                let passphrase = askPassphraseInput.text
-                //            askPassphraseInput.clear()
-                //            askPassphraseDialog.close()
-                cryptocam.passphraseAsked(passphrase)
-            }
 
             ColumnLayout {
                 anchors.fill: parent
+                anchors.margins: 20
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
@@ -88,6 +84,15 @@ ApplicationWindow {
                     visible: askPassphraseDialog.error
                     color: "red"
                 }
+                Button {
+                    id: askPassphraseOkButton
+                    text: "Ok"
+                    onClicked: {
+                        let passphrase = askPassphraseInput.text
+                        askPassphraseDialog.close()
+                        cryptocam.passphraseAsked(passphrase)
+                    }
+                }
             }
         }
     }
@@ -96,10 +101,11 @@ ApplicationWindow {
     Connections {
         target: cryptocam
         function onAskPassphrase(keyName, error) {
+            console.log("askPassphrase " + keyName)
             let dialog = askPassphraseDialogComponent.createObject(null)
             dialog.keyName = keyName
             dialog.error = error
-            dialog.open()
+            dialog.visible = true
         }
 
         function onErrorChanged() {
