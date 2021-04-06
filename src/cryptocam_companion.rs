@@ -250,6 +250,14 @@ impl CryptocamCompanion {
             let url = Url::parse(url.to_string().as_str()).unwrap();
             let path = urlencoding::decode(url.path()).unwrap();
             let path = PathBuf::from(path);
+            if self
+                ._files
+                .iter()
+                .map(|f| f.path.as_path())
+                .any(|p| p == path)
+            {
+                continue;
+            }
             if path.is_file() {
                 self._files.push(InputFile {
                     path,
