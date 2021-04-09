@@ -101,7 +101,6 @@ ApplicationWindow {
     Connections {
         target: cryptocam
         function onAskPassphrase(keyName, error) {
-            console.log("askPassphrase " + keyName)
             let dialog = askPassphraseDialogComponent.createObject(null)
             dialog.keyName = keyName
             dialog.error = error
