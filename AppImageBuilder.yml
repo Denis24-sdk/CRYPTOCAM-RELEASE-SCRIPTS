@@ -31,6 +31,7 @@ AppDir:
       - qml-module-qtquick-window2
       - qml-module-qtquick-layouts
       - qml-module-qtquick-dialogs
+      - libqt5svg5-dev
 
     exclude: []
 
