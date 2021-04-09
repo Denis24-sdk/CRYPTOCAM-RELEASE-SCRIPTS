@@ -34,7 +34,7 @@ COPY qml ./qml
 COPY src ./src
 COPY Cargo.toml cryptocam-companion.svg build.rs ./
 RUN cargo build --release -j8
-COPY target/release/cryptocam-qt ./
+RUN cp target/release/cryptocam-qt ./
 COPY AppImageBuilder.yml ./
 
 RUN appimage-builder --skip-tests
