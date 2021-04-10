@@ -6,8 +6,6 @@ Recording certain situations can be dangerous for the person using the camera as
      alt="Get it on F-Droid"
      height="80">](https://f-droid.org/packages/com.tnibler.cryptocam/)
 
-**Note: This is version 2.0 of Cryptocam which is very different from versions 1.x (and much better). v2.0 is not yet available on F-droid, so you have to download it from the [Releases](https://gitlab.com/cryptocam/cryptocam/-/releases) page if you want the new version.**
-
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="300">
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="300">
 <!-- replace with 2.0 screenshot <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="300"> -->
