@@ -3,9 +3,7 @@ physical access to your device or SD card.
 
 <h3>Find a full tutorial on <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a></h3>
 
-<h3>Find a full tutorial on <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a></h3>
-
-Worried that your device or memory card might get into the wrong hands with sensitive footage on it? 
+Worried that your device or memory card might get into the wrong hands with sensitive footage on it?
 Cryptocam uses <a href="https://github.com/FiloSottile/age">age</a> (X25519 and ChaCha20) to encrypt
 recorded video without ever persisting unencrypted data to device storage.
 
