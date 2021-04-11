@@ -331,6 +331,7 @@ dependencies = [
  "hex",
  "lazy-init",
  "libcryptocam",
+ "path-slash",
  "qmetaobject",
  "rust-ini 0.16.1",
  "threadpool",
@@ -756,7 +757,7 @@ checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
 [[package]]
 name = "libcryptocam"
 version = "0.1.0"
-source = "git+https://gitlab.com/cryptocam/libcryptocam?tag=v0.1.1#29ca32c9ec933d82b2ebe8f327d24d21338167e7"
+source = "git+https://gitlab.com/cryptocam/libcryptocam?tag=v0.1.2#5216d48560c719c8d2797262149d81f1c7b7055b"
 dependencies = [
  "ac-ffmpeg",
  "age",
@@ -941,6 +942,12 @@ dependencies = [
  "smallvec",
  "winapi",
 ]
+
+[[package]]
+name = "path-slash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cacbb3c4ff353b534a67fb8d7524d00229da4cb1dc8c79f4db96e375ab5b619"
 
 [[package]]
 name = "pbkdf2"
