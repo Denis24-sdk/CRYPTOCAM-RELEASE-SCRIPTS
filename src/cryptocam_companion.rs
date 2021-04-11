@@ -1,4 +1,5 @@
 extern crate qmetaobject;
+use path_slash::PathBufExt;
 use qmetaobject::*;
 use threadpool::ThreadPool;
 
@@ -154,6 +155,7 @@ impl CryptocamCompanion {
     }
 
     fn set_keyring_path(&mut self, url: QString) {
+        println!("Set keyring url: {}", url.to_string());
         match Url::parse(url.to_string().as_str()) {
             Err(e) => {
                 self.error = e.to_string().into();
@@ -161,7 +163,18 @@ impl CryptocamCompanion {
                 return;
             }
             Ok(url) => {
-                let path = PathBuf::from(urlencoding::decode(url.path()).unwrap());
+                let path = urlencoding::decode(url.path()).unwrap();
+                let path = {
+                    #[cfg(target_os = "windows")]
+                    {
+                        PathBuf::from_slash(path.trim_start_matches("/"))
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        PathBuf::from(path)
+                    }
+                };
+                println!("keyring path: {}", path.to_string_lossy());
                 self.keyring_path_exists = path.exists();
                 self.keyringPathExistsChanged();
                 match config::set_keyring_path(path.as_path()) {
@@ -183,9 +196,20 @@ impl CryptocamCompanion {
     }
 
     fn set_output_path(&mut self, output_path: QString) {
+        println!("Set output path: {}", output_path.to_string());
         let url = Url::parse(output_path.to_string().as_str()).unwrap();
-        let path: QString = url.path().into();
-        self.output_path = path;
+        let path = urlencoding::decode(url.path()).unwrap();
+        let output_path = {
+            #[cfg(target_os = "windows")]
+            {
+                PathBuf::from_slash(path.trim_start_matches("/"))
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                PathBuf::from(path)
+            }
+        };
+        self.output_path = output_path.to_string_lossy().to_string().into();
         self.outputPathChanged();
     }
 
@@ -244,6 +268,7 @@ impl CryptocamCompanion {
     // we get the urls separated by spaces here because I can't for the life of me figure
     // out how to pass a string array from qml to c++/rust with QVariantList and all that
     fn addFiles(&mut self, urls: QString) {
+        println!("Add file urls: {}", urls.to_string());
         self._files.retain(|f| match f.status {
             FileStatus::Done | FileStatus::Canceled | FileStatus::Error(_) => false,
             _ => true,
@@ -253,7 +278,17 @@ impl CryptocamCompanion {
         for url in urls {
             let url = Url::parse(url.to_string().as_str()).unwrap();
             let path = urlencoding::decode(url.path()).unwrap();
-            let path = PathBuf::from(path);
+            let path = {
+                #[cfg(target_os = "windows")]
+                {
+                    PathBuf::from_slash(path.trim_start_matches("/"))
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    PathBuf::from(path)
+                }
+            };
+            println!("path: {}", path.to_string_lossy());
             if self
                 ._files
                 .iter()
@@ -309,6 +344,7 @@ impl CryptocamCompanion {
 
     fn decryptClicked(&mut self) {
         let out_path = PathBuf::from(self.output_path.to_string());
+        println!("out_path: {}", out_path.to_string_lossy());
         let input_files: Vec<(usize, PathBuf, Arc<AtomicBool>)> = self
             ._files
             .iter()
@@ -320,6 +356,7 @@ impl CryptocamCompanion {
             .map(|(i, f)| (i, f.path.clone(), f.cancel.clone()))
             .collect();
         for (index, input_path, cancel) in input_files {
+            println!("input path: {}", input_path.to_string_lossy());
             let mut keyring = match &mut self.keyring {
                 None => {
                     self.error = "Error: No keyring opened!".to_string().into();
@@ -330,6 +367,7 @@ impl CryptocamCompanion {
             };
             let file = match fs::File::open(input_path.clone()) {
                 Err(e) => {
+                    println!("Error opening {}: {}", input_path.to_string_lossy(), e);
                     let status = FileStatus::Error(e.to_string());
                     self.set_file_status(index, status);
                     continue;
@@ -370,6 +408,7 @@ impl CryptocamCompanion {
                     _self.borrow_mut().set_file_status(index, status);
                 });
             });
+            println!("Starting decryption job");
             self.threadpool.execute(move || {
                 struct ProgressCallback {
                     offset: u64,
