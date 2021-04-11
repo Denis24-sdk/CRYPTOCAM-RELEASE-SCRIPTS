@@ -37,7 +37,7 @@ class OutputFileManager(
         writePlainTextHeader(outStream)
         outStream.close()
 
-        val outFd = contentResolver.openFileDescriptor(outFile.uri, "rwa", null)?.detachFd()
+        val outFd = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.detachFd()
             ?: throw RuntimeException("Error opening file descriptor")
         val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
         val encryptedWriter = Cryptocam_age_encryption.createWriterWithX25519Recipients(
