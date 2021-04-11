@@ -32,10 +32,6 @@ class PickOutputDirFragment : KeyedFragment(R.layout.pick_out_directory) {
                     putString(SettingsFragment.PREF_OUTPUT_DIRECTORY, uri.toString())
                     commit()
                 }
-                val dir = DocumentFile.fromTreeUri(requireContext(), uri)
-                if (dir?.findFile(".nomedia") == null) {
-                    dir?.createFile("asd/asd", ".nomedia")
-                }
                 (requireActivity() as MainActivity).nextOnboardingScreen(getKey())
             }
             pickOutDirButton.setOnClickListener {
