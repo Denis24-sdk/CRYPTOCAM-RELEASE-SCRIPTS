@@ -28,6 +28,8 @@ class PickOutputDirFragment : KeyedFragment(R.layout.pick_out_directory) {
             }
             val pickOutputDir = registerForActivityResult(openDocumentTree) { uri ->
                 uri ?: return@registerForActivityResult
+                requireContext().contentResolver.takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 PreferenceManager.getDefaultSharedPreferences(requireContext()).edit {
                     putString(SettingsFragment.PREF_OUTPUT_DIRECTORY, uri.toString())
                     commit()
