@@ -1,0 +1,8 @@
+Cryptocam le permite grabar vídeos encriptados para que sus grabaciones estén seguras incluso si un atacante obtiene
+acceso físico a su dispositivo o tarjeta SD.
+
+<h3>Encuentra un tutorial completo en <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a></h3>
+
+Le preocupa que su dispositivo o tarjeta de memoria pueda llegar a manos equivocadas con material sensible en él?
+Cryptocam utiliza <a href="https://github.com/FiloSottile/age">age</a> (X25519 y ChaCha20) para cifrar
+vídeo grabado sin que los datos sin cifrar persistan en el almacenamiento del dispositivo.
