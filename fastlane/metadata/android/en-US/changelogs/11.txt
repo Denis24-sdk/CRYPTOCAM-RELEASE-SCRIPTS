@@ -1,0 +1,5 @@
+Added spanish translation (by Diego Sanguinetti)
+
+Bugfixes:
+ - Fixed crash "Bad mode 'rwa'" on recording start
+ - Fixed permission for output directory not being persisted
