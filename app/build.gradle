@@ -89,6 +89,8 @@ dependencies {
     implementation 'com.github.Zhuinden:simple-stack-extensions:2.2.0'
     implementation 'commons-codec:commons-codec:1.15'
 
+    implementation 'com.google.zxing:core:3.3.3'
+
     releaseImplementation 'com.github.haroldadmin:WhatTheStack:0.2.0'
 
     testImplementation 'junit:junit:4.13'
