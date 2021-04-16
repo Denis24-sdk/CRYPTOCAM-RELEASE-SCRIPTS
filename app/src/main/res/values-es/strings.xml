@@ -43,4 +43,8 @@
     <string name="no_key_selected">No se ha seleccionado ninguna llave. Por favor, compruebe una clave en la configuración.</string>
     <string name="open_tutorial_site">Visite el tutorial web</string>
     <string name="tutorial_url">https://cryptocam.gitlab.io/</string>
+    <string name="delete_key">Borrar la llave</string>
+    <string name="public_key">Llave pública</string>
+    <string name="copied_public_key">Llave copiada al portapapel</string>
+    <string name="confirm_delete_key">¿Borrar la llave \"%s\"?</string>
 </resources>

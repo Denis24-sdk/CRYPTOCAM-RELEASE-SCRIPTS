@@ -44,4 +44,8 @@
     <string name="no_key_selected">Aucune clé sélectionnée! Veuillez cocher une clé dans les règlages.</string>
     <string name="open_tutorial_site">Visiter le site turoriel</string>
     <string name="tutorial_url">https://cryptocam.gitlab.io/fr</string>
+    <string name="public_key">Clé publique</string>
+    <string name="delete_key">Supprimer la clé</string>
+    <string name="confirm_delete_key">Supprimer la clé \"%s\"?</string>
+    <string name="copied_public_key">Clé copiée dans le presse-papier</string>
 </resources>

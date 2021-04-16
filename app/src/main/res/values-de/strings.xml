@@ -44,4 +44,8 @@
     <string name="actual_recording_resolution">Tatsächliche Auflösung: %s</string>
     <string name="open_tutorial_site">Tutorial-Webseite öffnen</string>
     <string name="tutorial_url">https://cryptocam.gitlab.io/de</string>
+    <string name="delete_key">Schlüssel löschen</string>
+    <string name="confirm_delete_key">Schlüssel \"%s\" löschen?</string>
+    <string name="copied_public_key">Schlüssel in die Zwischenablage kopiert</string>
+    <string name="public_key">Öffentlicher Schlüssel</string>
 </resources>

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 import org.apache.commons.codec.binary.Hex
 import java.io.File
+import java.lang.Exception
 import java.security.MessageDigest
 
 class KeyManager(private val context: Context, private val sharedPreferences: SharedPreferences) {
@@ -51,8 +52,7 @@ class KeyManager(private val context: Context, private val sharedPreferences: Sh
     }
 
     fun importRecipient(recipient: X25519Recipient): Boolean {
-        val filename = String(Hex.encodeHex(recipient.fingerprint))
-        val newFilePath = keysDir.path + File.separator + "$filename.txt"
+        val newFilePath = keyfilePath(recipient)
         Log.d(TAG, "new file path: $newFilePath")
         val newFile = File(newFilePath)
         return if (newFile.createNewFile()) {
@@ -63,6 +63,24 @@ class KeyManager(private val context: Context, private val sharedPreferences: Sh
         } else {
             false
         }
+    }
+
+    fun deleteRecipient(recipient: X25519Recipient) {
+        val keys = _keys.value - recipient
+        val selectedKeys = _selectedKeys.value - recipient
+        try {
+            File(keyfilePath(recipient)).delete()
+        }
+        catch (e: Exception) {
+            Log.e(TAG, "Error deleting keyfile: $e")
+        }
+        _selectedKeys.value = selectedKeys
+        _keys.value = keys
+    }
+
+    private fun keyfilePath(recipient: X25519Recipient): String {
+        val filename = String(Hex.encodeHex(recipient.fingerprint))
+        return keysDir.path + File.separator + "$filename.txt"
     }
 
     private fun readAvailableKeysFromStorage() {

@@ -38,13 +38,16 @@ class KeysFragment : KeyedFragment() {
                 orientation = LinearLayoutManager.VERTICAL
             }
             keysRecycler.layoutManager = layoutManager
-            val onKeyItemClick = { keyItem: KeyItem, isChecked: Boolean ->
+            val onKeyItemClicked = { keyItem: KeyItem ->
+                backstack.goTo(KeyDetailKey(keyItem.recipient))
+            }
+            val onKeyItemChecked = { keyItem: KeyItem, isChecked: Boolean ->
                 keyManager.setRecipientSelected(keyItem.recipient, isChecked)
                 if (keyManager.selectedRecipients.value.isEmpty()) {
                     Toast.makeText(requireContext(), getString(R.string.must_select_one_key), Toast.LENGTH_SHORT).show()
                 }
             }
-            val adapter = (keysRecycler.adapter as? KeyAdapter) ?: KeyAdapter(onKeyItemClick)
+            val adapter = (keysRecycler.adapter as? KeyAdapter) ?: KeyAdapter(onKeyItemClicked, onKeyItemChecked)
             keysRecycler.adapter = adapter
             lifecycleScope.launchWhenResumed {
                 keyManager.availableKeys

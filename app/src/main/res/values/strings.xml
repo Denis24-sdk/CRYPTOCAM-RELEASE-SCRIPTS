@@ -43,4 +43,8 @@
     <string name="go_to_tutorial"><a href="https://cryptocam.gitlab.io">Go to tutorial</a></string>
     <string name="open_tutorial_site">Visit tutorial site</string>
     <string name="tutorial_url">https://cryptocam.gitlab.io/</string>
+    <string name="delete_key">Delete key</string>
+    <string name="public_key">Public key</string>
+    <string name="copied_public_key">Copied key to clipboard</string>
+    <string name="confirm_delete_key">Delete key \"%s\"?</string>
 </resources>
