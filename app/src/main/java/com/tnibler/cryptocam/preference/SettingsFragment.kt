@@ -65,7 +65,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         screen.addPreference(keyPreference)
 
         val fpsPreference = ListPreference(context).apply {
-            setDefaultValue("60")
+            setDefaultValue("30")
             entries = arrayOf("30 fps", "60 fps")
             entryValues = arrayOf("30", "60")
         }
