@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.scanKey
 
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -15,6 +15,7 @@ import com.budiyev.android.codescanner.ScanMode
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.VideoFragment
 import com.tnibler.cryptocam.databinding.ScanKeyBinding
+import com.tnibler.cryptocam.keys.parseImportUri
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 

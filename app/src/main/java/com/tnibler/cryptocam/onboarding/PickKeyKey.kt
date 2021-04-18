@@ -1,7 +1,7 @@
 package com.tnibler.cryptocam.onboarding
 
 import androidx.fragment.app.Fragment
-import com.tnibler.cryptocam.keys.OnKeyScannedListener
+import com.tnibler.cryptocam.keys.scanKey.OnKeyScannedListener
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider

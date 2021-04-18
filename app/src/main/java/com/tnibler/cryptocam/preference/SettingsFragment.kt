@@ -12,7 +12,7 @@ import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.tnibler.cryptocam.R
-import com.tnibler.cryptocam.keys.KeysKey
+import com.tnibler.cryptocam.keys.keyList.KeysKey
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 
 class SettingsFragment : PreferenceFragmentCompat() {

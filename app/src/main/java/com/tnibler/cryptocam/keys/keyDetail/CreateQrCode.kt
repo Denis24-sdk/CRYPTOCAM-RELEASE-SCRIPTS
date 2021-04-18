@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.keyDetail
 
 import android.graphics.Bitmap
 import android.util.Log
@@ -6,6 +6,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.WriterException
 import com.google.zxing.qrcode.QRCodeWriter
+import com.tnibler.cryptocam.keys.KeyManager
 import java.net.URLEncoder
 
 fun createQrCode(recipient: KeyManager.X25519Recipient, size: Int): Bitmap? {

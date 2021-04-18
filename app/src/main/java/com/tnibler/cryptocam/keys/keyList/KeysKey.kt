@@ -1,6 +1,8 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.keyList
 
 import androidx.fragment.app.Fragment
+import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.keys.scanKey.OnKeyScannedListener
 import com.tnibler.cryptocam.onboarding.PickKeyViewModel
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey

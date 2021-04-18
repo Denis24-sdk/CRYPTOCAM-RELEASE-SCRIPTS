@@ -14,7 +14,7 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.ActivityMainBinding
 import com.tnibler.cryptocam.keys.KeyManager
-import com.tnibler.cryptocam.keys.KeysKey
+import com.tnibler.cryptocam.keys.keyList.KeysKey
 import com.tnibler.cryptocam.keys.parseImportUri
 import com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingKey
 import com.tnibler.cryptocam.onboarding.PickKeyKey

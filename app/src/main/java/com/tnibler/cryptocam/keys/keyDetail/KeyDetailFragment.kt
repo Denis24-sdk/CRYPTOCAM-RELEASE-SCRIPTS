@@ -1,17 +1,8 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.keyDetail
 
-import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.DialogInterface
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
-import android.media.Image
 import android.os.Bundle
-import android.util.Log
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import android.widget.ImageView
 import android.widget.Toast
@@ -19,6 +10,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.KeyDetailBinding
+import com.tnibler.cryptocam.keys.KeyManager
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup

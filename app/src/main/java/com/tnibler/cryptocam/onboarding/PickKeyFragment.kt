@@ -10,7 +10,7 @@ import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.PickKeyBinding
 import com.tnibler.cryptocam.keys.EditKeyDialog
 import com.tnibler.cryptocam.keys.KeyManager
-import com.tnibler.cryptocam.keys.ScannerKey
+import com.tnibler.cryptocam.keys.scanKey.ScannerKey
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup

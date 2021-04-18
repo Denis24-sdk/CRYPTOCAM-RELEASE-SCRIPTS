@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.keyList
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -11,6 +11,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.KeyListBinding
+import com.tnibler.cryptocam.keys.EditKeyDialog
+import com.tnibler.cryptocam.keys.keyDetail.KeyDetailKey
+import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.keys.scanKey.ScannerKey
 import com.tnibler.cryptocam.onboarding.PickKeyViewModel
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack

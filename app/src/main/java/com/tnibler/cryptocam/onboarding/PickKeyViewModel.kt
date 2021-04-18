@@ -1,7 +1,7 @@
 package com.tnibler.cryptocam.onboarding
 
 import com.tnibler.cryptocam.keys.KeyManager
-import com.tnibler.cryptocam.keys.OnKeyScannedListener
+import com.tnibler.cryptocam.keys.scanKey.OnKeyScannedListener
 import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

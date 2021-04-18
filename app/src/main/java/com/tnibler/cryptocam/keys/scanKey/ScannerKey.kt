@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam.keys
+package com.tnibler.cryptocam.keys.scanKey
 
 import androidx.fragment.app.Fragment
 import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey
