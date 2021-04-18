@@ -17,7 +17,7 @@ use std::{
     convert::TryInto,
     error::Error,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -88,6 +88,10 @@ pub struct CryptocamCompanion {
     keyListModelChanged: qt_signal!(),
     createKey:
         qt_method!(fn(&mut self, name: QString, passphrase: QString, passphraseConfirm: QString)),
+
+    deleteKey: qt_method!(fn(&mut self, index: usize)),
+    reallyDeleteKey: qt_method!(fn(&mut self, index: usize)),
+    deleteKeyConfirm: qt_signal!(key_name: QString, index: usize),
 
     fileListModel: qt_property!(RefCell<SimpleListModel<FileItem>>; NOTIFY fileListModelChanged),
     fileListModelChanged: qt_signal!(),
@@ -426,6 +430,25 @@ impl CryptocamCompanion {
                 self.set_file_status(index, FileStatus::Canceled);
             }
             _ => {}
+        };
+    }
+
+    fn deleteKey(&mut self, index: usize) {
+        let identity = &self.keyListModel.borrow()[index];
+        self.deleteKeyConfirm(identity.name.to_string().into(), index);
+    }
+
+    fn reallyDeleteKey(&mut self, index: usize) {
+        let path: PathBuf = PathBuf::from(self.keyListModel.borrow()[index].path());
+        match fs::remove_file(path) {
+            Err(e) => {
+                self.error = e.to_string().into();
+                self.errorChanged();
+                return;
+            }
+            Ok(()) => {
+                self.keyListModel.borrow_mut().remove(index);
+            }
         };
     }
 

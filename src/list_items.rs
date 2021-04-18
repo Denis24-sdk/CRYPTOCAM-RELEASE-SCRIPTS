@@ -5,6 +5,7 @@ use libcryptocam::{
     qrcode::render::svg,
 };
 use qmetaobject::*;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Default, SimpleListItem)]
 #[allow(non_snake_case)]
@@ -13,7 +14,14 @@ pub struct KeyItem {
     pub name: String,
     pub publicKey: String,
     pub qrCode: String,
+    path: PathBuf, //needs to be private as it's not a QMetaType field
     key_digest: KeyDigest,
+}
+
+impl KeyItem {
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
+    }
 }
 
 impl QMetaType for KeyItem {}
@@ -26,6 +34,7 @@ impl From<&DisplayIdentity> for KeyItem {
             publicKey: identity.public_key.clone(),
             qrCode: svg_qrcode(identity),
             key_digest: identity.public_key_digest,
+            path: identity.path.clone(),
         }
     }
 }
