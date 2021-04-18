@@ -128,7 +128,9 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         when (currentDestination) {
             is PickKeyKey -> {
                 if (!outputDirExists()) {
-                    backstack.goTo(PickOutputDirKey())
+                    // remove PickKey from history
+                    val history = backstack.getHistory<DefaultFragmentKey>()
+                    backstack.setHistory(history.drop(1) + PickOutputDirKey(), StateChange.FORWARD)
                 } else {
                     backstack.setHistory(
                         listOf<DefaultFragmentKey>(VideoKey()),
