@@ -1,11 +1,14 @@
 package com.tnibler.cryptocam.keys
 
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.budiyev.android.codescanner.CodeScanner
 import com.budiyev.android.codescanner.ScanMode
@@ -18,6 +21,7 @@ import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 class ScannerFragment : Fragment() {
     private var codeScanner: CodeScanner? = null
     private val TAG = javaClass.simpleName
+    private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java) as Vibrator }
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -55,12 +59,16 @@ class ScannerFragment : Fragment() {
                 requireActivity().runOnUiThread {
                     val recipient = parseImportUri(result.text)
                     if (recipient != null) {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            vibrator.vibrate(VibrationEffect.createOneShot(200, 128))
+                        }
+                        else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(200)
+                        }
                         codeScanner.releaseResources()
                         lookup<OnKeyScannedListener>().onKeyScanned(recipient)
                         backstack.goBack()
-//                        val history = backstack.getHistory<DefaultFragmentKey>()
-//                        val newHistory = history.dropLast(1) + EditKeyKey(recipient)
-//                        backstack.setHistory(newHistory, StateChange.BACKWARD)
                     } else {
                         Toast.makeText(
                             requireContext(),
