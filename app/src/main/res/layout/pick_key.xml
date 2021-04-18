@@ -50,17 +50,40 @@
 
     </ScrollView>
 
-    <Button
-        android:id="@+id/pickKeyButton"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_gravity="end|bottom"
-        android:drawableEnd="@drawable/ic_arrow_forward"
-        android:textColor="#fff"
-        android:textSize="18sp"
-        android:text="@string/scan_qrcode" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/pickKeyImportAsTextButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_gravity="start|bottom"
+            android:textColor="#fff"
+            android:textSize="18sp"
+            android:text="@string/import_from_string"
+            android:layout_weight="2"
+            android:textAlignment="viewStart"/>
+
+        <Button
+            android:id="@+id/pickKeyScanButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_gravity="end|bottom"
+            android:drawableEnd="@drawable/ic_arrow_forward"
+            android:textColor="#fff"
+            android:textSize="18sp"
+            android:text="@string/scan_qrcode"
+            android:layout_weight="2"
+            android:textAlignment="textEnd"/>
+
+    </LinearLayout>
 
 </LinearLayout>

@@ -10,7 +10,7 @@ import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.ImportKeyBinding
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 
-class ImportKeyDialog : DialogFragment() {
+class ImportKeyDialog(private val onImported: ((KeyManager.X25519Recipient) -> Unit)? = null) : DialogFragment() {
     override fun onStart() {
         super.onStart()
         // match_parent as layout_width in xml isn't working for some reason
@@ -44,7 +44,7 @@ class ImportKeyDialog : DialogFragment() {
                 }
                 val keyManager = lookup<KeyManager>()
                 keyManager.importRecipient(recipient)
-                keyManager.setRecipientSelected(recipient, true)
+                onImported?.invoke(recipient)
                 dismiss()
             }
             importKeyButtonCancel.setOnClickListener {

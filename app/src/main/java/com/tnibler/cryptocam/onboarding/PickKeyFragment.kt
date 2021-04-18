@@ -9,6 +9,7 @@ import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.PickKeyBinding
 import com.tnibler.cryptocam.keys.EditKeyDialog
+import com.tnibler.cryptocam.keys.ImportKeyDialog
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.keys.scanKey.ScannerKey
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
@@ -23,8 +24,14 @@ class PickKeyFragment : KeyedFragment(R.layout.pick_key) {
         super.onViewCreated(view, savedInstanceState)
         val binding = PickKeyBinding.bind(view)
         with(binding) {
-            pickKeyButton.setOnClickListener {
+            pickKeyScanButton.setOnClickListener {
                 backstack.goTo(ScannerKey())
+            }
+            pickKeyImportAsTextButton.setOnClickListener {
+                val dialog = ImportKeyDialog() { recipient ->
+                    goNext()
+                }
+                dialog.show(childFragmentManager, null)
             }
             viewLifecycleOwner.addRepeatingJob(Lifecycle.State.STARTED) {
                 viewModel.keyScanned.collect { recipient ->
