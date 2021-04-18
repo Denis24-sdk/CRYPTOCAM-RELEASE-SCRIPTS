@@ -44,7 +44,7 @@ class ScannerFragment : Fragment() {
                         "Permissions not granted by the user.",
                         Toast.LENGTH_SHORT
                     ).show()
-                    activity?.finish()
+                    backstack.goBack()
                 }
             }.launch(VideoFragment.REQUIRED_PERMISSIONS)
         } else {
