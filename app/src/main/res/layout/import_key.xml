@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/importKeyTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="24sp"
+        android:textColor="@android:color/white"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:text="@string/import_key"
+        android:layout_gravity="center_horizontal"/>
+
+    <TextView
+        android:id="@+id/importKeyPublicKeyLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="16sp"
+        android:textColor="@android:color/white"
+        android:labelFor="@id/importKeyPublicKeyEdit"
+        android:text="@string/public_key" />
+
+    <EditText
+        android:id="@+id/importKeyPublicKeyEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/public_key"
+        android:maxLines="1"
+        android:inputType="textNoSuggestions"
+        android:textColor="@android:color/white"/>
+
+    <TextView
+        android:id="@+id/importKeyErrorView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="invisible"
+        style="@style/errorTextStyle"
+        android:text="@string/invalid_public_key"/>
+
+    <TextView
+        android:id="@+id/importKeyNameLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="16sp"
+        android:labelFor="@id/importKeyNameEdit"
+        android:textColor="@android:color/white"
+        android:text="@string/key_name" />
+
+    <EditText
+        android:id="@+id/importKeyNameEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:inputType="textCapSentences"
+        android:hint="@string/key_name"/>
+
+    <TextView
+        android:id="@+id/importKeyNameErrorView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="invisible"
+        style="@style/errorTextStyle"
+        android:text="@string/name_empty_error"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/importKeyButtonCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/Widget.MaterialComponents.Button.TextButton.Dialog"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:text="@android:string/cancel"
+            android:layout_gravity="start"/>
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/importKeyButtonSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/save_key"
+            style="@style/Widget.MaterialComponents.Button.TextButton.Dialog"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:layout_gravity="end"/>
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -47,4 +47,7 @@
     <string name="public_key">Public key</string>
     <string name="copied_public_key">Copied key to clipboard</string>
     <string name="confirm_delete_key">Delete key \"%s\"?</string>
+    <string name="invalid_public_key">Invalid public key</string>
+    <string name="key_name">Key name</string>
+    <string name="import_from_string">Import key as text</string>
 </resources>

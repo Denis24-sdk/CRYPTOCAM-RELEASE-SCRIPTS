@@ -48,4 +48,7 @@
     <string name="confirm_delete_key">Schlüssel \"%s\" löschen?</string>
     <string name="copied_public_key">Schlüssel in die Zwischenablage kopiert</string>
     <string name="public_key">Öffentlicher Schlüssel</string>
+    <string name="invalid_public_key">Ungültiger Schlüssel</string>
+    <string name="key_name">Schlüsselname</string>
+    <string name="import_from_string">Schlüssel als Text importieren</string>
 </resources>

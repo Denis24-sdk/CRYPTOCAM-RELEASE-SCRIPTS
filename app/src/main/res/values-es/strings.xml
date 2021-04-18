@@ -47,4 +47,7 @@
     <string name="public_key">Llave pública</string>
     <string name="copied_public_key">Llave copiada al portapapel</string>
     <string name="confirm_delete_key">¿Borrar la llave \"%s\"?</string>
+    <string name="invalid_public_key">Clave inválida</string>
+    <string name="key_name">Nombre de la clave</string>
+    <string name="import_from_string">Importar una llave como texto</string>
 </resources>
