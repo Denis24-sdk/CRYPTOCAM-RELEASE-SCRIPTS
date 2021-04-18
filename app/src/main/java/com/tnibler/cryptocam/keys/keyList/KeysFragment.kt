@@ -56,7 +56,7 @@ class KeysFragment : KeyedFragment() {
             keysRecycler.adapter = adapter
             lifecycleScope.launchWhenResumed {
                 keyManager.availableKeys
-                    .zip(keyManager.availableKeys) { a, b -> a to b }
+                    .zip(keyManager.selectedRecipients) { a, b -> a to b }
                     .map { (recipients, selected) ->
                         recipients.map { recipient -> keyManager.toDisplayItem(recipient) }
                     }
