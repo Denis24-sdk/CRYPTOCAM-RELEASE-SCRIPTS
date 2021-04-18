@@ -15,7 +15,7 @@
         app:layout_constraintStart_toStartOf="parent"
         android:textSize="24sp"
         app:layout_constraintEnd_toEndOf="parent"
-        android:text="Import key" />
+        android:text="@string/import_key" />
 
     <TextView
         android:id="@+id/editKeyPublicKeyView"
@@ -55,6 +55,7 @@
         android:layout_height="wrap_content"
         app:layout_constraintTop_toBottomOf="@id/editKeyFingerprintView"
         app:layout_constraintStart_toStartOf="parent"
+        android:maxLines="1"
         tools:text="Some key name" />
 
     <Button
