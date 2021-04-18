@@ -41,10 +41,12 @@
 
     <TextView
         android:id="@+id/editKeyFingerprintView"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:textSize="16sp"
+        android:ellipsize="end"
+        android:maxLines="1"
         app:layout_constraintBaseline_toBaselineOf="@id/editKeyFingerprintLabel"
         app:layout_constraintStart_toEndOf="@id/editKeyFingerprintLabel"
         tools:text="d80f044493bc80be255ce0594cc28bc" />
