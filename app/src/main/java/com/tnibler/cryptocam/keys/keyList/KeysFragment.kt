@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.KeyListBinding
 import com.tnibler.cryptocam.keys.EditKeyDialog
+import com.tnibler.cryptocam.keys.ImportKeyDialog
 import com.tnibler.cryptocam.keys.keyDetail.KeyDetailKey
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.keys.scanKey.ScannerKey
@@ -62,6 +63,17 @@ class KeysFragment : KeyedFragment() {
                     .collect { keyItems ->
                         adapter.submitList(keyItems)
                     }
+            }
+
+            setHasOptionsMenu(true)
+            keysToolbar.inflateMenu(R.menu.key_list)
+            keysToolbar.setOnMenuItemClickListener { item ->
+                if (item.itemId == R.id.keyListImportFromString) {
+                    val dialog = ImportKeyDialog()
+                    dialog.show(childFragmentManager, null)
+                    true
+                }
+                false
             }
 
             keysFab.setOnClickListener {
