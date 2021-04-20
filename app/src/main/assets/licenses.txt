@@ -19,3 +19,6 @@ https://github.com/yuriy-budiyev/code-scanner
 
 Apache Commons Coded (Apache license v2):
 http://commons.apache.org/proper/commons-codec/
+
+ZXing (Apache license v2):
+https://github.com/zxing/zxing
