@@ -1,0 +1,3 @@
+ - Allow displaying the qr code for saved keys
+ - Import keys as text
+ - Set default framerate to 30fps
