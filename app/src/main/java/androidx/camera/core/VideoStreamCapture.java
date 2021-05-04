@@ -17,6 +17,8 @@
 package androidx.camera.core;
 
 import android.annotation.SuppressLint;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.location.Location;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -27,9 +29,13 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.media.MediaFormat;
 import android.media.MediaRecorder.AudioSource;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.provider.MediaStore;
 import android.util.Log;
+import android.util.Pair;
 import android.util.Size;
 import android.view.Display;
 import android.view.Surface;
@@ -41,24 +47,64 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.camera.core.impl.CameraInternal;
+import androidx.camera.core.impl.CaptureConfig;
 import androidx.camera.core.impl.Config;
 import androidx.camera.core.impl.ConfigProvider;
 import androidx.camera.core.impl.DeferrableSurface;
+import androidx.camera.core.impl.ImageOutputConfig;
 import androidx.camera.core.impl.ImageOutputConfig.RotationValue;
 import androidx.camera.core.impl.ImmediateSurface;
+import androidx.camera.core.impl.MutableConfig;
+import androidx.camera.core.impl.MutableOptionsBundle;
+import androidx.camera.core.impl.OptionsBundle;
 import androidx.camera.core.impl.SessionConfig;
 import androidx.camera.core.impl.UseCaseConfig;
 import androidx.camera.core.impl.UseCaseConfigFactory;
+import androidx.camera.core.impl.VideoCaptureConfig;
 import androidx.camera.core.impl.VideoStreamCaptureConfig;
 import androidx.camera.core.impl.utils.executor.CameraXExecutors;
+import androidx.camera.core.internal.ThreadConfig;
+import androidx.core.util.Consumer;
+import androidx.core.util.Preconditions;
 
+import java.io.File;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_DEFAULT_RESOLUTION;
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_MAX_RESOLUTION;
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_SUPPORTED_RESOLUTIONS;
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_TARGET_ASPECT_RATIO;
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_TARGET_RESOLUTION;
+import static androidx.camera.core.impl.ImageOutputConfig.OPTION_TARGET_ROTATION;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_ATTACHED_USE_CASES_UPDATE_LISTENER;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_CAMERA_SELECTOR;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_CAPTURE_CONFIG_UNPACKER;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_DEFAULT_CAPTURE_CONFIG;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_DEFAULT_SESSION_CONFIG;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_SESSION_CONFIG_UNPACKER;
+import static androidx.camera.core.impl.UseCaseConfig.OPTION_SURFACE_OCCUPANCY_PRIORITY;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_AUDIO_BIT_RATE;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_AUDIO_CHANNEL_COUNT;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_AUDIO_MIN_BUFFER_SIZE;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_AUDIO_RECORD_SOURCE;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_AUDIO_SAMPLE_RATE;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_BIT_RATE;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_INTRA_FRAME_INTERVAL;
+import static androidx.camera.core.impl.VideoCaptureConfig.OPTION_VIDEO_FRAME_RATE;
+import static androidx.camera.core.internal.TargetConfig.OPTION_TARGET_CLASS;
+import static androidx.camera.core.internal.TargetConfig.OPTION_TARGET_NAME;
+import static androidx.camera.core.internal.ThreadConfig.OPTION_BACKGROUND_EXECUTOR;
+import static androidx.camera.core.internal.UseCaseEventConfig.OPTION_USE_CASE_EVENT_CALLBACK;
 
 /**
  * A use case for taking a video.
@@ -212,7 +258,7 @@ public class VideoStreamCapture extends UseCase {
     @NonNull
     @Override
     public UseCaseConfig.Builder<?, ?, ?> getUseCaseConfigBuilder(@NonNull Config config) {
-        return VideoStreamCaptureConfig.Builder.fromConfig(config);
+        return VideoStreamCapture.Builder.fromConfig(config);
     }
 
     /**
@@ -889,8 +935,8 @@ public class VideoStreamCapture extends UseCase {
         private static final VideoStreamCaptureConfig DEFAULT_CONFIG;
 
         static {
-            VideoStreamCaptureConfig.Builder builder =
-                    new VideoStreamCaptureConfig.Builder()
+            VideoStreamCapture.Builder builder =
+                    new VideoStreamCapture.Builder()
                             .setVideoFrameRate(DEFAULT_VIDEO_FRAME_RATE)
                             .setBitRate(DEFAULT_BIT_RATE)
                             .setIFrameInterval(DEFAULT_INTRA_FRAME_INTERVAL)
@@ -944,5 +990,679 @@ public class VideoStreamCapture extends UseCase {
             }
         }
 
+    }
+
+    /** Builder for a {@link VideoStreamCapture}. */
+    @SuppressWarnings("ObjectToString")
+    public static final class Builder
+            implements
+            UseCaseConfig.Builder<VideoStreamCapture, VideoStreamCaptureConfig, VideoStreamCapture.Builder>,
+            ImageOutputConfig.Builder<VideoStreamCapture.Builder>,
+            ThreadConfig.Builder<VideoStreamCapture.Builder> {
+
+        private final MutableOptionsBundle mMutableConfig;
+
+        /** Creates a new Builder object. */
+        public Builder() {
+            this(MutableOptionsBundle.create());
+        }
+
+        private Builder(@NonNull MutableOptionsBundle mutableConfig) {
+            mMutableConfig = mutableConfig;
+
+            Class<?> oldConfigClass =
+                    mutableConfig.retrieveOption(OPTION_TARGET_CLASS, null);
+            if (oldConfigClass != null && !oldConfigClass.equals(VideoStreamCapture.class)) {
+                throw new IllegalArgumentException(
+                        "Invalid target class configuration for "
+                                + VideoStreamCapture.Builder.this
+                                + ": "
+                                + oldConfigClass);
+            }
+
+            setTargetClass(VideoStreamCapture.class);
+        }
+
+        /**
+         * Generates a Builder from another Config object.
+         *
+         * @param configuration An immutable configuration to pre-populate this builder.
+         * @return The new Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        static VideoStreamCapture.Builder fromConfig(@NonNull Config configuration) {
+            return new VideoStreamCapture.Builder(MutableOptionsBundle.from(configuration));
+        }
+
+
+        /**
+         * Generates a Builder from another Config object
+         *
+         * @param configuration An immutable configuration to pre-populate this builder.
+         * @return The new Builder.
+         */
+        @NonNull
+        public static VideoStreamCapture.Builder fromConfig(@NonNull VideoStreamCaptureConfig configuration) {
+            return new VideoStreamCapture.Builder(MutableOptionsBundle.from(configuration));
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public MutableConfig getMutableConfig() {
+            return mMutableConfig;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCaptureConfig getUseCaseConfig() {
+            return new VideoStreamCaptureConfig(OptionsBundle.from(mMutableConfig));
+        }
+
+        /**
+         * Builds an immutable {@link VideoStreamCaptureConfig} from the current state.
+         *
+         * @return A {@link VideoStreamCaptureConfig} populated with the current state.
+         */
+        @Override
+        @NonNull
+        public VideoStreamCapture build() {
+            // Error at runtime for using both setTargetResolution and setTargetAspectRatio on
+            // the same config.
+            if (getMutableConfig().retrieveOption(OPTION_TARGET_ASPECT_RATIO, null) != null
+                    && getMutableConfig().retrieveOption(OPTION_TARGET_RESOLUTION, null) != null) {
+                throw new IllegalArgumentException(
+                        "Cannot use both setTargetResolution and setTargetAspectRatio on the same "
+                                + "config.");
+            }
+            return new VideoStreamCapture(getUseCaseConfig());
+        }
+
+        /**
+         * Sets the recording frames per second.
+         *
+         * @param videoFrameRate The requested interval in seconds.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setVideoFrameRate(int videoFrameRate) {
+            getMutableConfig().insertOption(OPTION_VIDEO_FRAME_RATE, videoFrameRate);
+            return this;
+        }
+
+        /**
+         * Sets the encoding bit rate.
+         *
+         * @param bitRate The requested bit rate in bits per second.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setBitRate(int bitRate) {
+            getMutableConfig().insertOption(OPTION_BIT_RATE, bitRate);
+            return this;
+        }
+
+        /**
+         * Sets number of seconds between each key frame in seconds.
+         *
+         * @param interval The requested interval in seconds.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setIFrameInterval(int interval) {
+            getMutableConfig().insertOption(OPTION_INTRA_FRAME_INTERVAL, interval);
+            return this;
+        }
+
+        /**
+         * Sets the bit rate of the audio stream.
+         *
+         * @param bitRate The requested bit rate in bits/s.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setAudioBitRate(int bitRate) {
+            getMutableConfig().insertOption(OPTION_AUDIO_BIT_RATE, bitRate);
+            return this;
+        }
+
+        /**
+         * Sets the sample rate of the audio stream.
+         *
+         * @param sampleRate The requested sample rate in bits/s.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setAudioSampleRate(int sampleRate) {
+            getMutableConfig().insertOption(OPTION_AUDIO_SAMPLE_RATE, sampleRate);
+            return this;
+        }
+
+        /**
+         * Sets the number of audio channels.
+         *
+         * @param channelCount The requested number of audio channels.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setAudioChannelCount(int channelCount) {
+            getMutableConfig().insertOption(OPTION_AUDIO_CHANNEL_COUNT, channelCount);
+            return this;
+        }
+
+        /**
+         * Sets the audio source.
+         *
+         * @param source The audio source. Currently only AudioSource.MIC is supported.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setAudioRecordSource(int source) {
+            getMutableConfig().insertOption(OPTION_AUDIO_RECORD_SOURCE, source);
+            return this;
+        }
+
+        /**
+         * Sets the audio min buffer size.
+         *
+         * @param minBufferSize The requested audio minimum buffer size, in bytes.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public VideoStreamCapture.Builder setAudioMinBufferSize(int minBufferSize) {
+            getMutableConfig().insertOption(OPTION_AUDIO_MIN_BUFFER_SIZE, minBufferSize);
+            return this;
+        }
+
+        // Implementations of TargetConfig.Builder default methods
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setTargetClass(@NonNull Class<VideoStreamCapture> targetClass) {
+            getMutableConfig().insertOption(OPTION_TARGET_CLASS, targetClass);
+
+            // If no name is set yet, then generate a unique name
+            if (null == getMutableConfig().retrieveOption(OPTION_TARGET_NAME, null)) {
+                String targetName = targetClass.getCanonicalName() + "-" + UUID.randomUUID();
+                setTargetName(targetName);
+            }
+
+            return this;
+        }
+
+        /**
+         * Sets the name of the target object being configured, used only for debug logging.
+         *
+         * <p>The name should be a value that can uniquely identify an instance of the object being
+         * configured.
+         *
+         * <p>If not set, the target name will default to an unique name automatically generated
+         * with the class canonical name and random UUID.
+         *
+         * @param targetName A unique string identifier for the instance of the class being
+         *                   configured.
+         * @return the current Builder.
+         */
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setTargetName(@NonNull String targetName) {
+            getMutableConfig().insertOption(OPTION_TARGET_NAME, targetName);
+            return this;
+        }
+
+        // Implementations of ImageOutputConfig.Builder default methods
+
+        /**
+         * Sets the aspect ratio of the intended target for images from this configuration.
+         *
+         * <p>It is not allowed to set both target aspect ratio and target resolution on the same
+         * use case.
+         *
+         * <p>The target aspect ratio is used as a hint when determining the resulting output aspect
+         * ratio which may differ from the request, possibly due to device constraints.
+         * Application code should check the resulting output's resolution.
+         *
+         * <p>If not set, resolutions with aspect ratio 4:3 will be considered in higher
+         * priority.
+         *
+         * @param aspectRatio A {@link AspectRatio} representing the ratio of the
+         *                    target's width and height.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCapture.Builder setTargetAspectRatio(@AspectRatio.Ratio int aspectRatio) {
+            getMutableConfig().insertOption(OPTION_TARGET_ASPECT_RATIO, aspectRatio);
+            return this;
+        }
+
+        /**
+         * Sets the rotation of the intended target for images from this configuration.
+         *
+         * <p>This is one of four valid values: {@link Surface#ROTATION_0}, {@link
+         * Surface#ROTATION_90}, {@link Surface#ROTATION_180}, {@link Surface#ROTATION_270}.
+         * Rotation values are relative to the "natural" rotation, {@link Surface#ROTATION_0}.
+         *
+         * <p>If not set, the target rotation will default to the value of
+         * {@link Display#getRotation()} of the default display at the time the use case is
+         * created. The use case is fully created once it has been attached to a camera.
+         *
+         * @param rotation The rotation of the intended target.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCapture.Builder setTargetRotation(@RotationValue int rotation) {
+            getMutableConfig().insertOption(OPTION_TARGET_ROTATION, rotation);
+            return this;
+        }
+
+        /**
+         * Sets the resolution of the intended target from this configuration.
+         *
+         * <p>The target resolution attempts to establish a minimum bound for the image resolution.
+         * The actual image resolution will be the closest available resolution in size that is not
+         * smaller than the target resolution, as determined by the Camera implementation. However,
+         * if no resolution exists that is equal to or larger than the target resolution, the
+         * nearest available resolution smaller than the target resolution will be chosen.
+         *
+         * <p>It is not allowed to set both target aspect ratio and target resolution on the same
+         * use case.
+         *
+         * <p>The target aspect ratio will also be set the same as the aspect ratio of the provided
+         * {@link Size}. Make sure to set the target resolution with the correct orientation.
+         *
+         * @param resolution The target resolution to choose from supported output sizes list.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCapture.Builder setTargetResolution(@NonNull Size resolution) {
+            getMutableConfig().insertOption(OPTION_TARGET_RESOLUTION, resolution);
+            return this;
+        }
+
+        /**
+         * Sets the default resolution of the intended target from this configuration.
+         *
+         * @param resolution The default resolution to choose from supported output sizes list.
+         * @return The current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCapture.Builder setDefaultResolution(@NonNull Size resolution) {
+            getMutableConfig().insertOption(OPTION_DEFAULT_RESOLUTION, resolution);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        @Override
+        public VideoStreamCapture.Builder setMaxResolution(@NonNull Size resolution) {
+            getMutableConfig().insertOption(OPTION_MAX_RESOLUTION, resolution);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setSupportedResolutions(@NonNull List<Pair<Integer, Size[]>> resolutions) {
+            getMutableConfig().insertOption(OPTION_SUPPORTED_RESOLUTIONS, resolutions);
+            return this;
+        }
+
+        // Implementations of ThreadConfig.Builder default methods
+
+        /**
+         * Sets the default executor that will be used for background tasks.
+         *
+         * <p>If not set, the background executor will default to an automatically generated
+         * {@link Executor}.
+         *
+         * @param executor The executor which will be used for background tasks.
+         * @return the current Builder.
+         * @hide
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setBackgroundExecutor(@NonNull Executor executor) {
+            getMutableConfig().insertOption(OPTION_BACKGROUND_EXECUTOR, executor);
+            return this;
+        }
+
+        // Implementations of UseCaseConfig.Builder default methods
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setDefaultSessionConfig(@NonNull SessionConfig sessionConfig) {
+            getMutableConfig().insertOption(OPTION_DEFAULT_SESSION_CONFIG, sessionConfig);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setDefaultCaptureConfig(@NonNull CaptureConfig captureConfig) {
+            getMutableConfig().insertOption(OPTION_DEFAULT_CAPTURE_CONFIG, captureConfig);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setSessionOptionUnpacker(
+                @NonNull SessionConfig.OptionUnpacker optionUnpacker) {
+            getMutableConfig().insertOption(OPTION_SESSION_CONFIG_UNPACKER, optionUnpacker);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setCaptureOptionUnpacker(
+                @NonNull CaptureConfig.OptionUnpacker optionUnpacker) {
+            getMutableConfig().insertOption(OPTION_CAPTURE_CONFIG_UNPACKER, optionUnpacker);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setSurfaceOccupancyPriority(int priority) {
+            getMutableConfig().insertOption(OPTION_SURFACE_OCCUPANCY_PRIORITY, priority);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setCameraSelector(@NonNull CameraSelector cameraSelector) {
+            getMutableConfig().insertOption(OPTION_CAMERA_SELECTOR, cameraSelector);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setUseCaseEventCallback(
+                @NonNull UseCase.EventCallback useCaseEventCallback) {
+            getMutableConfig().insertOption(OPTION_USE_CASE_EVENT_CALLBACK, useCaseEventCallback);
+            return this;
+        }
+
+        /** @hide */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @Override
+        @NonNull
+        public VideoStreamCapture.Builder setAttachedUseCasesUpdateListener(
+                @NonNull Consumer<Collection<UseCase>> attachedUseCasesUpdateListener) {
+            getMutableConfig().insertOption(OPTION_ATTACHED_USE_CASES_UPDATE_LISTENER,
+                    attachedUseCasesUpdateListener);
+            return this;
+        }
+
+    }
+
+    /**
+     * Info about the saved video file.
+     */
+    public static class OutputFileResults {
+        @Nullable
+        private Uri mSavedUri;
+
+        OutputFileResults(@Nullable Uri savedUri) {
+            mSavedUri = savedUri;
+        }
+
+        /**
+         * Returns the {@link Uri} of the saved video file.
+         *
+         * <p> This field is only returned if the {@link VideoStreamCapture.OutputFileOptions} is
+         * backed by {@link MediaStore} constructed with
+         * {@link androidx.camera.core.VideoStreamCapture.OutputFileOptions}.
+         */
+        @Nullable
+        public Uri getSavedUri() {
+            return mSavedUri;
+        }
+    }
+
+    /**
+     * Options for saving newly captured video.
+     *
+     * <p> this class is used to configure save location and metadata. Save location can be
+     * either a {@link File}, {@link MediaStore}. The metadata will be
+     * stored with the saved video.
+     */
+    public static final class OutputFileOptions {
+
+        // Empty metadata object used as a placeholder for no user-supplied metadata.
+        // Should be initialized to all default values.
+        private static final VideoStreamCapture.Metadata EMPTY_METADATA = new VideoStreamCapture.Metadata();
+
+        @Nullable
+        private final File mFile;
+        @Nullable
+        private final FileDescriptor mFileDescriptor;
+        @Nullable
+        private final ContentResolver mContentResolver;
+        @Nullable
+        private final Uri mSaveCollection;
+        @Nullable
+        private final ContentValues mContentValues;
+        @Nullable
+        private final VideoStreamCapture.Metadata mMetadata;
+
+        OutputFileOptions(@Nullable File file,
+                          @Nullable FileDescriptor fileDescriptor,
+                          @Nullable ContentResolver contentResolver,
+                          @Nullable Uri saveCollection,
+                          @Nullable ContentValues contentValues,
+                          @Nullable VideoStreamCapture.Metadata metadata) {
+            mFile = file;
+            mFileDescriptor = fileDescriptor;
+            mContentResolver = contentResolver;
+            mSaveCollection = saveCollection;
+            mContentValues = contentValues;
+            mMetadata = metadata == null ? EMPTY_METADATA : metadata;
+        }
+
+        /** Returns the File object which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}. */
+        @Nullable
+        File getFile() {
+            return mFile;
+        }
+
+        /**
+         * Returns the FileDescriptor object which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}.
+         */
+        @Nullable
+        FileDescriptor getFileDescriptor() {
+            return mFileDescriptor;
+        }
+
+        /** Returns the content resolver which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}. */
+        @Nullable
+        ContentResolver getContentResolver() {
+            return mContentResolver;
+        }
+
+        /** Returns the URI which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}. */
+        @Nullable
+        Uri getSaveCollection() {
+            return mSaveCollection;
+        }
+
+        /** Returns the content values which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}. */
+        @Nullable
+        ContentValues getContentValues() {
+            return mContentValues;
+        }
+
+        /** Return the metadata which is set by the {@link VideoStreamCapture.OutputFileOptions.Builder}.. */
+        @Nullable
+        VideoStreamCapture.Metadata getMetadata() {
+            return mMetadata;
+        }
+
+        /** Checking the caller wants to save video to MediaStore. */
+        boolean isSavingToMediaStore() {
+            return getSaveCollection() != null && getContentResolver() != null
+                    && getContentValues() != null;
+        }
+
+        /** Checking the caller wants to save video to a File. */
+        boolean isSavingToFile() {
+            return getFile() != null;
+        }
+
+        /** Checking the caller wants to save video to a FileDescriptor. */
+        boolean isSavingToFileDescriptor() {
+            return getFileDescriptor() != null;
+        }
+
+        /**
+         * Builder class for {@link VideoStreamCapture.OutputFileOptions}.
+         */
+        public static final class Builder {
+            @Nullable
+            private File mFile;
+            @Nullable
+            private FileDescriptor mFileDescriptor;
+            @Nullable
+            private ContentResolver mContentResolver;
+            @Nullable
+            private Uri mSaveCollection;
+            @Nullable
+            private ContentValues mContentValues;
+            @Nullable
+            private VideoStreamCapture.Metadata mMetadata;
+
+            /**
+             * Creates options to write captured video to a {@link File}.
+             *
+             * @param file save location of the video.
+             */
+            public Builder(@NonNull File file) {
+                mFile = file;
+            }
+
+            /**
+             * Creates options to write captured video to a {@link FileDescriptor}.
+             *
+             * <p>Using a FileDescriptor to record a video is only supported for Android 8.0 or
+             * above.
+             *
+             * @param fileDescriptor to save the video.
+             * @throws IllegalArgumentException when the device is not running Android 8.0 or above.
+             */
+            public Builder(@NonNull FileDescriptor fileDescriptor) {
+                Preconditions.checkArgument(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O,
+                        "Using a FileDescriptor to record a video is only supported for Android 8"
+                                + ".0 or above.");
+
+                mFileDescriptor = fileDescriptor;
+            }
+
+            /**
+             * Creates options to write captured video to {@link MediaStore}.
+             *
+             * Example:
+             *
+             * <pre>{@code
+             *
+             * ContentValues contentValues = new ContentValues();
+             * contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, "NEW_VIDEO");
+             * contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+             *
+             * OutputFileOptions options = new OutputFileOptions.Builder(
+             *         getContentResolver(),
+             *         MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+             *         contentValues).build();
+             *
+             * }</pre>
+             *
+             * @param contentResolver to access {@link MediaStore}
+             * @param saveCollection  The URL of the table to insert into.
+             * @param contentValues   to be included in the created video file.
+             */
+            public Builder(@NonNull ContentResolver contentResolver,
+                           @NonNull Uri saveCollection,
+                           @NonNull ContentValues contentValues) {
+                mContentResolver = contentResolver;
+                mSaveCollection = saveCollection;
+                mContentValues = contentValues;
+            }
+
+            /**
+             * Sets the metadata to be stored with the saved video.
+             *
+             * @param metadata Metadata to be stored with the saved video.
+             */
+            @NonNull
+            public VideoStreamCapture.OutputFileOptions.Builder setMetadata(@NonNull VideoStreamCapture.Metadata metadata) {
+                mMetadata = metadata;
+                return this;
+            }
+
+            /**
+             * Builds {@link VideoStreamCapture.OutputFileOptions}.
+             */
+            @NonNull
+            public VideoStreamCapture.OutputFileOptions build() {
+                return new VideoStreamCapture.OutputFileOptions(mFile, mFileDescriptor, mContentResolver,
+                        mSaveCollection, mContentValues, mMetadata);
+            }
+        }
     }
 }

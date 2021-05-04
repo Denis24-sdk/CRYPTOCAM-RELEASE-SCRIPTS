@@ -293,7 +293,7 @@ class RecordingService : Service(), LifecycleOwner {
             TAG,
             "Building videoCapture with resolution=$resolution, targetRotation=$surfaceRotation"
         )
-        val videoCaptureBuilder = VideoStreamCaptureConfig.Builder()
+        val videoCaptureBuilder = VideoStreamCapture.Builder()
             .setVideoFrameRate(60)
             .setCameraSelector(cameraSelector)
             .setTargetResolution(resolution)
