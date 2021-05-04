@@ -20,6 +20,8 @@ import androidx.camera.core.Camera
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.addRepeatingJob
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
@@ -53,6 +55,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private var focusCircleView: View? = null
     private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.AUTO)
     private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }
+    private val viewModel: PhotoViewModel by lazy { lookup() }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
@@ -103,13 +106,19 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                     FlashMode.OFF -> FlashMode.AUTO
                 }
             }
-            lifecycleScope.launchWhenResumed {
+            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.RESUMED) {
                 flashMode.collect { flashMode ->
                     photoBtnFlash.setImageResource(when (flashMode) {
                         FlashMode.AUTO -> R.drawable.ic_flash_auto
                         FlashMode.ON -> R.drawable.ic_flash_on
                         FlashMode.OFF -> R.drawable.ic_flash_off
                     })
+                }
+            }
+            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.RESUMED) {
+                viewModel.volumeKeyPressed.collect {
+                    Log.d(TAG, "volume key pressed")
+                    takePhoto(binding)
                 }
             }
         }
@@ -223,6 +232,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         binding.photoFeedbackView.visibility = View.VISIBLE
         imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()), callback)
     }
+
 
     override fun onStart() {
         super.onStart()

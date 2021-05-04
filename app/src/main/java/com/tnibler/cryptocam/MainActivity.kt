@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
 import android.view.Window
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
@@ -29,6 +30,7 @@ import com.zhuinden.simplestackextensions.fragments.DefaultFragmentStateChanger
 import com.zhuinden.simplestackextensions.navigatorktx.backstack
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.get
+import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -122,6 +124,19 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume()")
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            Log.d(TAG, "Volume key pressed")
+            if (backstack.canFindService(VolumeKeyPressListener::class.java.name)) {
+                Log.d(TAG, "Can find VolumeKeyPressListener")
+                val listener: VolumeKeyPressListener = backstack.lookup()
+                listener.onVolumeKeyDown()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     fun nextOnboardingScreen(currentDestination: DefaultFragmentKey) {
