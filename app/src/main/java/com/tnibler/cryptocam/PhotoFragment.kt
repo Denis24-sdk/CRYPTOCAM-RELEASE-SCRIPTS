@@ -25,6 +25,7 @@ import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.preference.SettingsKey
 import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
@@ -86,6 +87,9 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 this@PhotoFragment.camera = camera
                 setUpZoomAndFocus(camera, binding)
             }, ContextCompat.getMainExecutor(requireContext()))
+            photoBtnSettings.setOnClickListener {
+                backstack.goTo(SettingsKey())
+            }
             btnTakePhoto.setOnClickListener {
                 takePhoto(binding)
             }
