@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam
+package com.tnibler.cryptocam.video
 
 import android.Manifest
 import android.content.ComponentName
@@ -24,8 +24,10 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.VideoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.photo.PhotoKey
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.preference.SettingsKey
 import com.zhuinden.simplestack.StateChange

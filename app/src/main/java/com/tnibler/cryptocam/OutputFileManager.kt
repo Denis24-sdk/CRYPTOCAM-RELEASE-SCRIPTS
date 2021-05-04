@@ -6,6 +6,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.video.AudioInfo
+import com.tnibler.cryptocam.video.VideoInfo
 import cryptocam_age_encryption.Cryptocam_age_encryption
 import cryptocam_age_encryption.EncryptedWriter
 import org.json.JSONObject

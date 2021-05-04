@@ -22,6 +22,7 @@ import com.tnibler.cryptocam.onboarding.PickKeyKey
 import com.tnibler.cryptocam.onboarding.PickOutputDirKey
 import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.video.VideoKey
 import com.zhuinden.simplestack.SimpleStateChanger
 import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestack.navigator.Navigator

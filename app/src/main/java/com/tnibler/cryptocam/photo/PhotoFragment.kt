@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam
+package com.tnibler.cryptocam.photo
 
 import android.graphics.*
 import android.graphics.drawable.Drawable
@@ -22,8 +22,11 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.addRepeatingJob
-import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.OutputFileManager
+import com.tnibler.cryptocam.R
+import com.tnibler.cryptocam.video.RecordingService
+import com.tnibler.cryptocam.video.VideoKey
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
@@ -32,10 +35,8 @@ import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.parcelize.Parcelize
 
 class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private val TAG = javaClass.simpleName
@@ -51,7 +52,9 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private var surfaceRotation = Surface.ROTATION_0
     private val orientationEventListener by lazy { buildOrientationEventListener() }
     private var camera: Camera? = null
-    private val focusDrawable: Drawable by lazy { ContextCompat.getDrawable(requireContext(), R.drawable.ic_focus)!! }
+    private val focusDrawable: Drawable by lazy { ContextCompat.getDrawable(requireContext(),
+        R.drawable.ic_focus
+    )!! }
     private var focusCircleView: View? = null
     private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.AUTO)
     private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }

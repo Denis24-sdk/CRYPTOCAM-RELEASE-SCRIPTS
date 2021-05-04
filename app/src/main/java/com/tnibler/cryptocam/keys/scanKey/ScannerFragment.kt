@@ -13,7 +13,7 @@ import androidx.fragment.app.Fragment
 import com.budiyev.android.codescanner.CodeScanner
 import com.budiyev.android.codescanner.ScanMode
 import com.tnibler.cryptocam.R
-import com.tnibler.cryptocam.VideoFragment
+import com.tnibler.cryptocam.video.VideoFragment
 import com.tnibler.cryptocam.databinding.ScanKeyBinding
 import com.tnibler.cryptocam.keys.parseImportUri
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack

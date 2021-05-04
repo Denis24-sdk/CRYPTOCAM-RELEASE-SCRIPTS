@@ -1,4 +1,4 @@
-package com.tnibler.cryptocam
+package com.tnibler.cryptocam.video
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -15,7 +15,6 @@ import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.Toast
 import androidx.camera.core.*
-import androidx.camera.core.impl.VideoStreamCaptureConfig
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -24,6 +23,11 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.App
+import com.tnibler.cryptocam.CameraSettings
+import com.tnibler.cryptocam.MainActivity
+import com.tnibler.cryptocam.OutputFileManager
+import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
 import kotlinx.coroutines.delay

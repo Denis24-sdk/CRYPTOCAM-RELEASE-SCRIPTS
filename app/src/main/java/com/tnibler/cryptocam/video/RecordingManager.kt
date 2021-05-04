@@ -1,10 +1,12 @@
-package com.tnibler.cryptocam
+package com.tnibler.cryptocam.video
 
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import androidx.camera.core.EncodedBufferHandler
 import androidx.camera.core.VideoStreamCapture
+import com.tnibler.cryptocam.CameraSettings
+import com.tnibler.cryptocam.OutputFileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.Duration

@@ -1,8 +1,8 @@
-package com.tnibler.cryptocam
+package com.tnibler.cryptocam.photo
 
 import android.os.Parcelable
 import android.util.Log
-import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.VolumeKeyPressListener
 import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

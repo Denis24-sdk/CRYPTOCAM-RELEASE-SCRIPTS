@@ -35,7 +35,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name="com.tnibler.cryptocam.RecordingService"
+            android:name="com.tnibler.cryptocam.video.RecordingService"
             android:foregroundServiceType="camera|microphone">
 
         </service>
