@@ -17,6 +17,7 @@ import androidx.camera.core.Camera
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
@@ -26,6 +27,9 @@ import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.parcelize.Parcelize
 
 class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private val TAG = javaClass.simpleName
@@ -43,10 +47,19 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private var camera: Camera? = null
     private val focusDrawable: Drawable by lazy { ContextCompat.getDrawable(requireContext(), R.drawable.ic_focus)!! }
     private var focusCircleView: View? = null
+    private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.AUTO)
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putSerializable(KEY_FLASH_MODE, flashMode.value)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val binding = PhotoScreenBinding.bind(view)
+        if (savedInstanceState != null) {
+            flashMode.value = savedInstanceState.getSerializable(KEY_FLASH_MODE) as FlashMode? ?: FlashMode.AUTO
+        }
         with (binding) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
             cameraProviderFuture.addListener(Runnable {
@@ -70,10 +83,26 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 setUpZoomAndFocus(camera, binding)
             }, ContextCompat.getMainExecutor(requireContext()))
             btnTakePhoto.setOnClickListener {
-                takePhoto()
+                takePhoto(binding)
             }
             photoBtnVideo.setOnClickListener {
                 backstack.setHistory(listOf(VideoKey()), StateChange.REPLACE)
+            }
+            photoBtnFlash.setOnClickListener {
+                flashMode.value = when(flashMode.value) {
+                    FlashMode.AUTO -> FlashMode.ON
+                    FlashMode.ON -> FlashMode.OFF
+                    FlashMode.OFF -> FlashMode.AUTO
+                }
+            }
+            lifecycleScope.launchWhenResumed {
+                flashMode.collect { flashMode ->
+                    photoBtnFlash.setImageResource(when (flashMode) {
+                        FlashMode.AUTO -> R.drawable.ic_flash_auto
+                        FlashMode.ON -> R.drawable.ic_flash_on
+                        FlashMode.OFF -> R.drawable.ic_flash_off
+                    })
+                }
             }
         }
     }
@@ -135,7 +164,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         }
     }
 
-    private fun takePhoto() {
+    private fun takePhoto(binding: PhotoScreenBinding) {
         Log.d(TAG, "takePhoto()")
         val imageCapture = imageCapture
         if (imageCapture == null) {
@@ -155,8 +184,8 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 imageBuffer.get(buf)
                 imageFile.write(buf)
                 imageFile.close()
-                Toast.makeText(requireContext(), "Saved image", Toast.LENGTH_SHORT).show()
                 imageProxy.close()
+                binding.photoFeedbackView.visibility = View.GONE
                 return
             }
 
@@ -164,13 +193,18 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 Toast.makeText(requireContext(), "$exception", Toast.LENGTH_SHORT).show()
             }
         }
-        Log.d(TAG, "surfaceRotation=$surfaceRotation")
+        imageCapture.flashMode = when (flashMode.value) {
+            FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
+            FlashMode.ON -> ImageCapture.FLASH_MODE_ON
+            FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
+        }
         imageCapture.targetRotation = surfaceRotation
         // we can not use any of the ImageCapture methods that write to files
         // or to a provided OutputStream like this one
         // https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:camera/camera-core/src/main/java/androidx/camera/core/ImageCapture.java;drc=b61f0e09fd1f9c20f1575e78d4a2a8a15fe5c825;l=811
         // In https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:camera/camera-core/src/main/java/androidx/camera/core/ImageSaver.java;l=85;drc=ded69ff18456e1501b418d281c562bc4bb215937
         // the image is written to a temporary file on disk which must never happen
+        binding.photoFeedbackView.visibility = View.VISIBLE
         imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()), callback)
     }
 
@@ -207,5 +241,13 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 }
             }
         }
+    }
+
+    companion object {
+        private const val KEY_FLASH_MODE = "flashMode"
+    }
+
+    private enum class FlashMode {
+        AUTO, ON, OFF
     }
 }
