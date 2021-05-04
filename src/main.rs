@@ -25,8 +25,6 @@ qrc!(qml_resources,
 );
 
 fn main() {
-    let name = std::ffi::CString::new("World").unwrap();
-    let name_ptr = name.as_ptr();
     if env::var("QT_QUICK_CONTROLS_STYLE").is_err() {
         unsafe {
             cpp!([]  {
