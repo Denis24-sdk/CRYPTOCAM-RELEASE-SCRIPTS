@@ -41,7 +41,7 @@ COPY src ./src
 COPY Cargo.toml cryptocam-companion.svg build.rs ./
 RUN cargo update
 
-RUN CFLAGS="-static-libgcc -Wl,-Bstatic,-lpthread,-Wl,-Bdynamic" CXXFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic,-lstdc++,-lpthread,-Wl,-Bdynamic" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/bin cargo build --target x86_64-pc-windows-gnu --release --verbose
+RUN CFLAGS="-static-libgcc -Wl,-Bstatic,-lpthread,-Wl,-Bdynamic" CXXFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic,-lstdc++,-lpthread,-Wl,-Bdynamic -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/bin cargo build --target x86_64-pc-windows-gnu --release --verbose
 
 RUN mkdir package
 RUN rm ffmpeg/bin/avdevice*.dll ffmpeg/bin/postproc*.dll ffmpeg/bin/*.exe
