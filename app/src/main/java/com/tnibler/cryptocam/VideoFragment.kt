@@ -28,6 +28,7 @@ import com.tnibler.cryptocam.databinding.VideoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.preference.SettingsKey
+import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.delay
@@ -112,6 +113,11 @@ class VideoFragment : Fragment() {
 
     private fun setupUi(binding: VideoScreenBinding) {
         binding.run {
+            btnPhoto.setOnClickListener {
+                if (service?.state?.value !is RecordingService.State.Recording) {
+                    backstack.setHistory(listOf(PhotoKey()), StateChange.REPLACE)
+                }
+            }
             btnFlash.setOnClickListener {
                 service?.toggleFlash()
             }
@@ -164,10 +170,12 @@ class VideoFragment : Fragment() {
                     is RecordingService.State.ReadyToRecord -> {
                         setUpPreview(state.resolution, state.surfaceRotation, this)
                         currentCamera = state.selectedCamera
+                        btnPhoto.visibility = View.VISIBLE
                     }
                     is RecordingService.State.Recording -> {
                         setUpPreview(state.resolution, state.surfaceRotation, this)
                         currentCamera = state.selectedCamera
+                        btnPhoto.visibility = View.INVISIBLE
                     }
                 }
             }

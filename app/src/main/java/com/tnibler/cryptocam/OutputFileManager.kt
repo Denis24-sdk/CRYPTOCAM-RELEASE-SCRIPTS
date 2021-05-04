@@ -3,6 +3,7 @@ package com.tnibler.cryptocam
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.keys.KeyManager
 import cryptocam_age_encryption.Cryptocam_age_encryption
@@ -45,9 +46,39 @@ class OutputFileManager(
             recipientsConcat
         )
         val ef = EncryptedFile(encryptedWriter)
-        writeHeader(ef, metadata.size)
+        writeHeader(ef, metadata.size, FileType.VIDEO)
         ef.write(metadata)
         return VideoFile(ef)
+    }
+
+    fun newImageFile(): ImageFile {
+        Log.d(TAG, "newImageFile()")
+        val out = DocumentFile.fromTreeUri(context, outputLocation)
+            ?: throw RuntimeException("Error opening output directory")
+        val filename = randomFilename()
+        val metadata = buildImageMetadata()
+
+        val outFile = out.createFile("application/binary", "$filename.cryptocam.age")
+            ?: throw RuntimeException("Error creating output file")
+        val outStream = contentResolver.openOutputStream(outFile.uri)
+            ?: throw RuntimeException("Error opening output file")
+        writePlainTextHeader(outStream)
+        Log.d(TAG, "Wrote plaintext header")
+        outStream.close()
+
+        val outFd = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.detachFd()
+            ?: throw RuntimeException("Error opening file descriptor")
+        val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
+        val encryptedWriter = Cryptocam_age_encryption.createWriterWithX25519Recipients(
+            outFd.toLong(),
+            recipientsConcat
+        )
+        Log.d(TAG, "Created encrypted writer")
+        val ef = EncryptedFile(encryptedWriter)
+        writeHeader(ef, metadata.size, FileType.IMAGE)
+        ef.write(metadata)
+        Log.d(TAG, "Wrote metadata")
+        return ImageFile(ef)
     }
 
     private fun writePlainTextHeader(out: OutputStream) {
@@ -69,11 +100,15 @@ class OutputFileManager(
         }
     }
 
-    private fun writeHeader(encryptedFile: EncryptedFile, metadataSize: Int) {
+    private fun writeHeader(encryptedFile: EncryptedFile, metadataSize: Int, type: FileType) {
         val bb = ByteBuffer.allocate(1 + 4)
         bb.order(ByteOrder.LITTLE_ENDIAN)
         // file type: only video for now
-        bb.put(1)
+        val t: Byte = when (type) {
+            FileType.VIDEO -> 1
+            FileType.IMAGE -> 2
+        }
+        bb.put(t)
         // offset to data
         val offsetToData: Int = bb.capacity() + metadataSize
         // this is a signed int but we're just going to assume we're not writing 2GB of metadata
@@ -91,6 +126,13 @@ class OutputFileManager(
         json.put("audio_sample_rate", audioInfo.sampleRate)
         json.put("audio_channel_count", audioInfo.channelCount)
         json.put("audio_bitrate", audioInfo.bitrate)
+        return json.toString().toByteArray()
+    }
+
+    private fun buildImageMetadata(): ByteArray {
+        val json = JSONObject()
+        json.put("timestamp", dateTime())
+        json.put("format", "jpg")
         return json.toString().toByteArray()
     }
 
@@ -141,5 +183,25 @@ class OutputFileManager(
         fun close() {
             encryptedFile.close()
         }
+    }
+
+    class ImageFile(private val encryptedFile: EncryptedFile) : OutputStream() {
+        override fun write(b: Int) {
+            encryptedFile.write(byteArrayOf(b.toByte()))
+        }
+
+        override fun write(b: ByteArray?) {
+            if (b != null) {
+                encryptedFile.write(b)
+            }
+        }
+
+        override fun close() {
+            encryptedFile.close()
+        }
+    }
+
+    enum class FileType {
+        IMAGE, VIDEO
     }
 }
