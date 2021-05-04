@@ -50,4 +50,6 @@
     <string name="invalid_public_key">Invalid public key</string>
     <string name="key_name">Key name</string>
     <string name="import_from_string">Import key as text</string>
+    <string name="vibrate_on_photo">Haptic feedback for photos</string>
+    <string name="vibrate_on_photo_summary">Vibrate when shutter button is pressed</string>
 </resources>

@@ -4,7 +4,10 @@ import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import android.view.*
 import android.view.animation.AlphaAnimation
@@ -48,6 +51,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private val focusDrawable: Drawable by lazy { ContextCompat.getDrawable(requireContext(), R.drawable.ic_focus)!! }
     private var focusCircleView: View? = null
     private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.AUTO)
+    private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
@@ -170,6 +174,14 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         if (imageCapture == null) {
             Log.w(TAG, "ImageCapture UseCase is null in takePhoto")
             return
+        }
+        if (sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_ON_PHOTO, true)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(20, 80))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(20)
+            }
         }
         val imageFile = outputFileManager.newImageFile()
         val callback = object : ImageCapture.OnImageCapturedCallback() {

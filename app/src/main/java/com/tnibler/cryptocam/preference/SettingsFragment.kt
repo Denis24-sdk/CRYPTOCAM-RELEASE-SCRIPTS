@@ -124,6 +124,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         screen.addPreference(vibrateWhileRecordingPreference)
 
+        val vibrateOnPhotoPreference = CheckBoxPreference(context)
+        vibrateOnPhotoPreference.setDefaultValue(true)
+        vibrateOnPhotoPreference.key = PREF_VIBRATE_ON_PHOTO
+        vibrateOnPhotoPreference.title = getString(R.string.vibrate_on_photo)
+        vibrateOnPhotoPreference.summary = getString(R.string.vibrate_on_photo_summary)
+
+        screen.addPreference(vibrateOnPhotoPreference)
+
         val tutorialPreference = Preference(context)
         tutorialPreference.key = "tutorial"
         tutorialPreference.title = getString(R.string.open_tutorial_site)
@@ -158,6 +166,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_OVERLAY = "enableOverlay"
         const val PREF_RECORD_ON_START = "recordOnStart"
         const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
+        const val PREF_VIBRATE_ON_PHOTO = "vibrateOnPhoto"
         const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
 
         const val SHOWED_BACKGROUND_RECORDING_INFO = "showedBackgroundRecordingInfo"
