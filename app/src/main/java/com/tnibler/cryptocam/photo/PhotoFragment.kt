@@ -56,7 +56,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         R.drawable.ic_focus
     )!! }
     private var focusCircleView: View? = null
-    private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.AUTO)
+    private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.OFF)
     private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }
     private val viewModel: PhotoViewModel by lazy { lookup() }
 
@@ -69,7 +69,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         super.onViewCreated(view, savedInstanceState)
         val binding = PhotoScreenBinding.bind(view)
         if (savedInstanceState != null) {
-            flashMode.value = savedInstanceState.getSerializable(KEY_FLASH_MODE) as FlashMode? ?: FlashMode.AUTO
+            flashMode.value = savedInstanceState.getSerializable(KEY_FLASH_MODE) as FlashMode? ?: FlashMode.OFF
         }
         with (binding) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
