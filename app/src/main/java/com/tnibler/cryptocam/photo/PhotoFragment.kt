@@ -25,6 +25,7 @@ import androidx.lifecycle.addRepeatingJob
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.OutputFileManager
 import com.tnibler.cryptocam.R
+import com.tnibler.cryptocam.SelectedCamera
 import com.tnibler.cryptocam.video.RecordingService
 import com.tnibler.cryptocam.video.VideoKey
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
@@ -35,7 +36,6 @@ import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 
 class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
@@ -56,42 +56,19 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         R.drawable.ic_focus
     )!! }
     private var focusCircleView: View? = null
-    private var flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.OFF)
     private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }
     private val viewModel: PhotoViewModel by lazy { lookup() }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putSerializable(KEY_FLASH_MODE, flashMode.value)
-    }
+    private var cameraProvider: ProcessCameraProvider? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val binding = PhotoScreenBinding.bind(view)
-        if (savedInstanceState != null) {
-            flashMode.value = savedInstanceState.getSerializable(KEY_FLASH_MODE) as FlashMode? ?: FlashMode.OFF
-        }
         with (binding) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
             cameraProviderFuture.addListener(Runnable {
                 val cameraProvider = cameraProviderFuture.get()
-                viewFinder.scaleType = PreviewView.ScaleType.FIT_CENTER
-                val preview = Preview.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                    .setTargetRotation(viewFinder.display.rotation)
-                    .build()
-                    .apply {
-                        setSurfaceProvider(viewFinder.surfaceProvider)
-                    }
-                imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                    .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
-                    .build()
-                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                cameraProvider.unbindAll()
-                val camera = cameraProvider.bindToLifecycle(this@PhotoFragment, cameraSelector, preview, imageCapture)
-                this@PhotoFragment.camera = camera
-                setUpZoomAndFocus(camera, binding)
+                this@PhotoFragment.cameraProvider = cameraProvider
+                setUpCamera(cameraProvider, binding)
             }, ContextCompat.getMainExecutor(requireContext()))
             photoBtnSettings.setOnClickListener {
                 backstack.goTo(SettingsKey())
@@ -103,18 +80,33 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 backstack.setHistory(listOf(VideoKey()), StateChange.REPLACE)
             }
             photoBtnFlash.setOnClickListener {
-                flashMode.value = when(flashMode.value) {
-                    FlashMode.AUTO -> FlashMode.ON
-                    FlashMode.ON -> FlashMode.OFF
-                    FlashMode.OFF -> FlashMode.AUTO
+                viewModel.flashMode.value = when(viewModel.flashMode.value) {
+                    PhotoViewModel.FlashMode.AUTO -> PhotoViewModel.FlashMode.ON
+                    PhotoViewModel.FlashMode.ON -> PhotoViewModel.FlashMode.OFF
+                    PhotoViewModel.FlashMode.OFF -> PhotoViewModel.FlashMode.AUTO
                 }
             }
+            photoBtnToggleCamera.setOnClickListener {
+                viewModel.selectedCamera = viewModel.selectedCamera.other()
+                val cameraProvider = cameraProvider
+                if (cameraProvider != null) {
+                    setUpCamera(cameraProvider, binding)
+                    photoBtnToggleCamera.setImageResource(when(viewModel.selectedCamera) {
+                        SelectedCamera.FRONT -> R.drawable.ic_outline_camera_rear
+                        SelectedCamera.BACK -> R.drawable.ic_outline_camera_front
+                    })
+                }
+            }
+            photoBtnToggleCamera.setImageResource(when(viewModel.selectedCamera) {
+                SelectedCamera.FRONT -> R.drawable.ic_outline_camera_rear
+                SelectedCamera.BACK -> R.drawable.ic_outline_camera_front
+            })
             viewLifecycleOwner.addRepeatingJob(Lifecycle.State.RESUMED) {
-                flashMode.collect { flashMode ->
+                viewModel.flashMode.collect { flashMode ->
                     photoBtnFlash.setImageResource(when (flashMode) {
-                        FlashMode.AUTO -> R.drawable.ic_flash_auto
-                        FlashMode.ON -> R.drawable.ic_flash_on
-                        FlashMode.OFF -> R.drawable.ic_flash_off
+                        PhotoViewModel.FlashMode.AUTO -> R.drawable.ic_flash_auto
+                        PhotoViewModel.FlashMode.ON -> R.drawable.ic_flash_on
+                        PhotoViewModel.FlashMode.OFF -> R.drawable.ic_flash_off
                     })
                 }
             }
@@ -124,6 +116,31 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                     takePhoto(binding)
                 }
             }
+        }
+    }
+
+    private fun setUpCamera(cameraProvider: ProcessCameraProvider, binding: PhotoScreenBinding) {
+        with(binding) {
+            viewFinder.scaleType = PreviewView.ScaleType.FIT_CENTER
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetRotation(viewFinder.display.rotation)
+                .build()
+                .apply {
+                    setSurfaceProvider(viewFinder.surfaceProvider)
+                }
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+                .build()
+            val cameraSelector = when (viewModel.selectedCamera) {
+                SelectedCamera.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+                SelectedCamera.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+            }
+            cameraProvider.unbindAll()
+            val camera = cameraProvider.bindToLifecycle(this@PhotoFragment, cameraSelector, preview, imageCapture)
+            this@PhotoFragment.camera = camera
+            setUpZoomAndFocus(camera, binding)
         }
     }
 
@@ -221,10 +238,10 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 Toast.makeText(requireContext(), "$exception", Toast.LENGTH_SHORT).show()
             }
         }
-        imageCapture.flashMode = when (flashMode.value) {
-            FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
-            FlashMode.ON -> ImageCapture.FLASH_MODE_ON
-            FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
+        imageCapture.flashMode = when (viewModel.flashMode.value) {
+            PhotoViewModel.FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
+            PhotoViewModel.FlashMode.ON -> ImageCapture.FLASH_MODE_ON
+            PhotoViewModel.FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
         }
         imageCapture.targetRotation = surfaceRotation
         // we can not use any of the ImageCapture methods that write to files
@@ -246,6 +263,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         super.onStop()
         orientationEventListener.disable()
         camera = null
+        cameraProvider = null
     }
 
     private val fade = AlphaAnimation(1.0f, 0.0f).apply {
@@ -276,7 +294,4 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         private const val KEY_FLASH_MODE = "flashMode"
     }
 
-    private enum class FlashMode {
-        AUTO, ON, OFF
-    }
 }
