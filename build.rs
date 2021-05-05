@@ -1,42 +1,106 @@
 /* Copyright (C) 2018 Olivier Goffart <ogoffart@woboq.com>
+
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
 including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
 and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in all copies or substantial
 portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
 NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
 NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
 OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-extern crate cpp_build;
-use std::path::PathBuf;
-use std::{process::Command, str::FromStr};
 
-fn qmake_query(var: &str) -> String {
-    String::from_utf8(
-        Command::new("qmake")
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::Path;
+use std::process::Command;
+
+fn qmake_query(var: &str) -> Result<String, std::io::Error> {
+    let qmake = std::env::var("QMAKE").unwrap_or("qmake".to_string());
+    Ok(String::from_utf8(
+        Command::new(qmake)
+            .env("QT_SELECT", "qt5")
             .args(&["-query", var])
-            .output()
-            .expect("Failed to execute qmake. Make sure 'qmake' is in your path")
+            .output()?
             .stdout,
     )
-    .expect("UTF-8 conversion failed")
+    .expect("UTF-8 conversion failed"))
+}
+
+// qreal is a double, unless QT_COORD_TYPE says otherwise:
+// https://doc.qt.io/qt-5/qtglobal.html#qreal-typedef
+fn detect_qreal_size(qt_include_path: &str, qt_library_path: &str) {
+    let mut path = Path::new(qt_include_path).join("QtCore/qconfig.h");
+    if cfg!(target_os = "macos") {
+        if !path.exists() {
+            path = Path::new(qt_library_path).join("QtCore.framework/Headers/qconfig.h");
+        }
+    }
+    let f = std::fs::File::open(&path).expect(&format!("Cannot open `{:?}`", path));
+    let b = BufReader::new(f);
+
+    // Find declaration of QT_COORD_TYPE
+    for line in b.lines() {
+        let line = line.expect("qconfig.h is valid UTF-8");
+        if line.contains("QT_COORD_TYPE") {
+            if line.contains("float") {
+                println!("cargo:rustc-cfg=qreal_is_float");
+                return;
+            } else {
+                panic!("QT_COORD_TYPE with unknown declaration {}", line);
+            }
+        }
+    }
 }
 
 fn main() {
-    let qt_include_path = qmake_query("QT_INSTALL_HEADERS");
-    let qt_library_path = qmake_query("QT_INSTALL_LIBS");
+    let qt_version = match qmake_query("QT_VERSION") {
+        Ok(v) => v,
+        Err(_err) => {
+            #[cfg(feature = "required")]
+            panic!(
+                "Error: Failed to execute qmake. Make sure 'qmake' is in your path!\n{:?}",
+                _err
+            );
+            #[cfg(not(feature = "required"))]
+            {
+                println!("cargo:rustc-cfg=no_qt");
+                println!("cargo:FOUND=0");
+                return;
+            }
+        }
+    };
 
-    cpp_build::Config::new()
-        .include(qt_include_path.trim())
-        .include(qt_include_path.trim().to_owned() + "/QtQuick")
-        .include(qt_include_path.trim().to_owned() + "/QtCore")
-        .include(qt_include_path.trim().to_owned() + "/QtQuickControls2")
-        .build("src/main.rs");
+    let qt_include_path = match std::env::var("DEP_QT_INCLUDE_PATH") {
+        Ok(p) => p,
+        Err(_) => qmake_query("QT_INSTALL_HEADERS").unwrap(),
+    };
+    let qt_library_path = match std::env::var("DEP_QT_LIBRARY_PATH") {
+        Ok(p) => p,
+        Err(_) => qmake_query("QT_INSTALL_LIBS").unwrap(),
+    };
+
+    let mut config = cpp_build::Config::new();
+
+    if cfg!(target_os = "macos") {
+        config.flag("-F");
+        config.flag(qt_library_path.trim());
+    }
+
+    detect_qreal_size(&qt_include_path.trim(), qt_library_path.trim());
+
+    config.include(qt_include_path.trim()).build("src/main.rs");
+
+    println!("cargo:VERSION={}", qt_version.trim());
+    println!("cargo:LIBRARY_PATH={}", qt_library_path.trim());
+    println!("cargo:INCLUDE_PATH={}", qt_include_path.trim());
+    println!("cargo:FOUND=1");
 
     let macos_lib_search = if cfg!(target_os = "macos") {
         "=framework"
@@ -45,33 +109,40 @@ fn main() {
     };
     let macos_lib_framework = if cfg!(target_os = "macos") { "" } else { "5" };
 
+    let debug = std::env::var("DEBUG").ok().map_or(false, |s| s == "true");
+    let windows_dbg_suffix = if debug && cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-lib=msvcrtd");
+        "d"
+    } else {
+        ""
+    };
+
+    if cfg!(target_os = "macos") {
+        println!(
+            "cargo:rustc-cdylib-link-arg=-Wl,-rpath,{}",
+            qt_library_path.trim()
+        );
+    }
+
     println!(
         "cargo:rustc-link-search{}={}",
         macos_lib_search,
         qt_library_path.trim()
     );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}Widgets",
-        macos_lib_search, macos_lib_framework
-    );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}Gui",
-        macos_lib_search, macos_lib_framework
-    );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}Core",
-        macos_lib_search, macos_lib_framework
-    );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}Quick",
-        macos_lib_search, macos_lib_framework
-    );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}QuickControls2",
-        macos_lib_search, macos_lib_framework
-    );
-    println!(
-        "cargo:rustc-link-lib{}=Qt{}Qml",
-        macos_lib_search, macos_lib_framework
-    );
+
+    let link_lib = |lib: &str| {
+        println!(
+            "cargo:rustc-link-lib{search}=Qt{vers}{lib}{suffix}",
+            search = macos_lib_search,
+            vers = macos_lib_framework,
+            lib = lib,
+            suffix = windows_dbg_suffix
+        )
+    };
+    link_lib("Core");
+    link_lib("Gui");
+    link_lib("Widgets");
+    link_lib("Quick");
+    link_lib("Qml");
+    link_lib("QuickControls2");
 }

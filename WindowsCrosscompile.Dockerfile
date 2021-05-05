@@ -21,35 +21,36 @@ RUN wget https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z
 RUN 7z x ffmpeg-release-full-shared.7z
 RUN mv ffmpeg-4.4-full_build-shared ffmpeg
 
-RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/qt.qt5.5150.win64_mingw81/5.15.0-0-202005150700qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
-RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/qt.qt5.5150.win64_mingw81/5.15.0-0-202005150700qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtquickcontrols2-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtsvg-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtquickcontrols-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_mingw/qt.tools.win64_mingw810/8.1.0-1-202004170606x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z
 
-RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/qt.qt5.5150.win64_mingw81/5.15.0-0-202005150700qtquickcontrols2-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
-RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/qt.qt5.5150.win64_mingw81/5.15.0-0-202005150700qtsvg-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
-RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5150/qt.qt5.5150.win64_mingw81/5.15.0-0-202005150700qtquickcontrols-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN 7z x -oqt_libs 5.15.2-0-202011130602qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
+RUN 7z x -oqt_libs 5.15.2-0-202011130602qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
+RUN 7z x -oqt_libs 5.15.2-0-202011130602qtquickcontrols2-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
+RUN 7z x -oqt_libs 5.15.2-0-202011130602qtsvg-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
+RUN 7z x -oqt_libs 5.15.2-0-202011130602qtquickcontrols-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
+RUN 7z x -otools_mingw 8.1.0-1-202004170606x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z
 
-RUN 7z x -oqt_libs 5.15.0-0-202005150700qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.0/mingw81_64
-RUN 7z x -oqt_libs 5.15.0-0-202005150700qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.0/mingw81_64
-RUN 7z x -oqt_libs 5.15.0-0-202005150700qtquickcontrols2-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.0/mingw81_64
-RUN 7z x -oqt_libs 5.15.0-0-202005150700qtsvg-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.0/mingw81_64
-RUN 7z x -oqt_libs 5.15.0-0-202005150700qtquickcontrols-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z
-
-RUN cp -r qt_libs/5.15.0/mingw81_64/bin/*.dll /usr/x86_64-w64-mingw32/lib/
+RUN rm qt_libs/5.15.2/mingw81_64/bin/*.exe
 
 COPY qml ./qml
 COPY src ./src
 COPY Cargo.toml cryptocam-companion.svg build.rs ./
 RUN cargo update
 
-RUN CFLAGS="-static-libgcc -Wl,-Bstatic,-lpthread,-Wl,-Bdynamic" CXXFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic,-lstdc++,-lpthread,-Wl,-Bdynamic -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/bin cargo build --target x86_64-pc-windows-gnu --release --verbose
+RUN DEP_QT_INCLUDE_PATH="/build/qt_libs/5.15.2/mingw81_64/include" DEP_QT_LIBRARY_PATH="/build/qt_libs/5.15.2/mingw81_64/lib"  CXXFLAGS="-lstdc++,-lpthread -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/lib cargo build --target x86_64-pc-windows-gnu --release --verbose
 
 RUN mkdir package
 RUN rm ffmpeg/bin/avdevice*.dll ffmpeg/bin/postproc*.dll ffmpeg/bin/*.exe
-RUN cp -r qt_libs/5.15.0/mingw81_64/* package/
+RUN cp -r qt_libs/5.15.2/mingw81_64/* package/
 RUN cp ffmpeg/bin/* package/bin
-RUN cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll \
-        /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libstdc++-6.dll \
-        /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libgcc_s_seh-1.dll \
+RUN cp /build/tools_mingw/Tools/mingw810_64/bin/libwinpthread-1.dll \
+        /build/tools_mingw/Tools/mingw810_64/bin/libstdc++-6.dll \
+        /build/tools_mingw/Tools/mingw810_64/bin/libgcc_s_seh-1.dll \
         package/bin
 
 RUN cp target/x86_64-pc-windows-gnu/release/cryptocam-qt.exe package/bin/CryptocamCompanion.exe

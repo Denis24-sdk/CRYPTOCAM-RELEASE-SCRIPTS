@@ -8,7 +8,8 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-qmetaobject = "0.1.4"
+#qmetaobject = "0.2.0"
+qmetaobject = { git = "https://github.com/tnibler/qmetaobject-rs", branch = "override-qt-paths" }
 cstr = "0.1.7"
 cpp = "0.5.6"
 libcryptocam = { git = "https://gitlab.com/cryptocam/libcryptocam", tag = "v0.1.2" }
@@ -25,6 +26,9 @@ threadpool = "1.8.1"
 rust-ini = "0.16.1"
 dirs-next = "2.0.0"
 path-slash = "0.1.4"
+
+[target.'cfg(unix)'.dependencies]
+# qttypes = "0.2.0" # automatically searches for qt include/lib paths which we don't want for windows
 
 [build-dependencies]
 cpp_build = "0.5.6"
