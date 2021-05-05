@@ -23,10 +23,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
-import com.tnibler.cryptocam.App
-import com.tnibler.cryptocam.CameraSettings
-import com.tnibler.cryptocam.MainActivity
-import com.tnibler.cryptocam.OutputFileManager
+import com.tnibler.cryptocam.*
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
@@ -521,15 +518,6 @@ class RecordingService : Service(), LifecycleOwner {
     inner class RecordingServiceBinder : Binder() {
         val service: RecordingService
             get() = this@RecordingService
-    }
-
-    enum class SelectedCamera {
-        FRONT, BACK;
-
-        fun other() = when (this) {
-            BACK -> FRONT
-            FRONT -> BACK
-        }
     }
 
     sealed class State(open val selectedCamera: SelectedCamera, open val flashOn: Boolean) {

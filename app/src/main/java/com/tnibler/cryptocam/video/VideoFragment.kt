@@ -25,6 +25,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.R
+import com.tnibler.cryptocam.SelectedCamera
 import com.tnibler.cryptocam.databinding.VideoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.photo.PhotoKey
@@ -63,7 +64,7 @@ class VideoFragment : Fragment() {
         }
     }
 
-    private var currentCamera: RecordingService.SelectedCamera? = null
+    private var currentCamera: SelectedCamera? = null
 
     private fun onServiceBound(service: RecordingService) {
         Log.d(TAG, "onServiceBound")
@@ -227,8 +228,8 @@ class VideoFragment : Fragment() {
                     btnToggleCamera.visibility = View.VISIBLE
                     btnToggleCamera.setImageResource(
                         when (state.selectedCamera) {
-                            RecordingService.SelectedCamera.BACK -> R.drawable.ic_outline_camera_rear
-                            RecordingService.SelectedCamera.FRONT -> R.drawable.ic_outline_camera_front
+                            SelectedCamera.BACK -> R.drawable.ic_outline_camera_front
+                            SelectedCamera.FRONT -> R.drawable.ic_outline_camera_rear
                         }
                     )
                     btnRecordVideo.visibility = View.VISIBLE
