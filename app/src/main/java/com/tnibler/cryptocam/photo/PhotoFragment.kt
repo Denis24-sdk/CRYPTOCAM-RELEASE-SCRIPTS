@@ -24,10 +24,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.addRepeatingJob
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.Orientation
 import com.tnibler.cryptocam.OutputFileManager
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.SelectedCamera
-import com.tnibler.cryptocam.video.RecordingService
 import com.tnibler.cryptocam.video.VideoKey
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
@@ -53,6 +53,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     ) }
     private var surfaceRotation = Surface.ROTATION_0
     private val orientationEventListener by lazy { buildOrientationEventListener() }
+    private var lastHandledOrientation: Orientation? = null
     private var camera: Camera? = null
     private val focusDrawable: Drawable by lazy { ContextCompat.getDrawable(requireContext(),
         R.drawable.ic_focus
@@ -61,11 +62,13 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private val vibrator by lazy { ContextCompat.getSystemService(requireContext(), Vibrator::class.java)!! }
     private val viewModel: PhotoViewModel by lazy { lookup() }
     private var cameraProvider: ProcessCameraProvider? = null
+    private var binding: PhotoScreenBinding? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val binding = PhotoScreenBinding.bind(view)
         with (binding) {
+            this@PhotoFragment.binding = binding
             val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
             cameraProviderFuture.addListener(Runnable {
                 val cameraProvider = cameraProviderFuture.get()
@@ -281,6 +284,30 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         cameraProvider = null
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        binding = null
+    }
+
+    private fun rotateUiTo(currentOrientation: Orientation) {
+        val degrees = when (currentOrientation) {
+            Orientation.LAND_LEFT -> 90.also { Log.d(TAG, "land left") }
+            Orientation.LAND_RIGHT -> (-90).also { Log.d(TAG, "land right") }
+            Orientation.PORTRAIT -> 0.also { Log.d(TAG, "portrait") }
+        }
+        binding?.photoOverlayText?.rotation = when (currentOrientation) {
+            Orientation.LAND_RIGHT -> -90f
+            Orientation.LAND_LEFT -> 90f
+            Orientation.PORTRAIT -> 0f
+        }
+        binding?.run {
+            listOf(photoBtnFlash, photoBtnToggleCamera, photoBtnSettings, photoBtnFlash, photoBtnVideo)
+                .forEach { v ->
+                    v.animate().rotation(degrees.toFloat()).start()
+                }
+        }
+    }
+
     private val fade = AlphaAnimation(1.0f, 0.0f).apply {
         startOffset = 1000
         duration = 500
@@ -292,15 +319,19 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
             override fun onOrientationChanged(orientation: Int) {
 //                Log.d(TAG, "onOrientationChanged: $orientation")
                 val currentOrientation = when (orientation) {
-                    in 75..134 -> RecordingService.Orientation.LAND_RIGHT
-                    in 224..289 -> RecordingService.Orientation.LAND_LEFT
-                    else -> RecordingService.Orientation.PORTRAIT
+                    in 75..134 -> Orientation.LAND_RIGHT
+                    in 224..289 -> Orientation.LAND_LEFT
+                    else -> Orientation.PORTRAIT
+                }
+                if (currentOrientation != lastHandledOrientation) {
+                    rotateUiTo(currentOrientation)
                 }
                 surfaceRotation = when (currentOrientation) {
-                    RecordingService.Orientation.PORTRAIT -> Surface.ROTATION_0
-                    RecordingService.Orientation.LAND_RIGHT -> Surface.ROTATION_270
-                    RecordingService.Orientation.LAND_LEFT -> Surface.ROTATION_90
+                    Orientation.PORTRAIT -> Surface.ROTATION_0
+                    Orientation.LAND_RIGHT -> Surface.ROTATION_270
+                    Orientation.LAND_LEFT -> Surface.ROTATION_90
                 }
+                lastHandledOrientation = currentOrientation
             }
         }
     }
