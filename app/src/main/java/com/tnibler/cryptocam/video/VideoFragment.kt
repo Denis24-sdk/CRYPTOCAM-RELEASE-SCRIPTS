@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -24,6 +25,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
+import com.tnibler.cryptocam.Orientation
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.SelectedCamera
 import com.tnibler.cryptocam.databinding.VideoScreenBinding
@@ -65,6 +67,23 @@ class VideoFragment : Fragment() {
     }
 
     private var currentCamera: SelectedCamera? = null
+
+    private val orientationEventListener by lazy {
+        object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
+            override fun onOrientationChanged(orientation: Int) {
+                val currentOrientation = when (orientation) {
+                    in 75..134 -> Orientation.LAND_RIGHT
+                    in 224..289 -> Orientation.LAND_LEFT
+                    else -> Orientation.PORTRAIT
+                }
+                if (currentOrientation != lastHandledOrientation) {
+                    rotateUiTo(currentOrientation)
+                }
+                lastHandledOrientation = currentOrientation
+            }
+        }
+    }
+    private var lastHandledOrientation: Orientation? = null
 
     private fun onServiceBound(service: RecordingService) {
         Log.d(TAG, "onServiceBound")
@@ -164,6 +183,7 @@ class VideoFragment : Fragment() {
         } else {
             onServiceBound(service)
         }
+        orientationEventListener.enable()
     }
 
     private fun onStateChanged(state: RecordingService.State) {
@@ -311,6 +331,7 @@ class VideoFragment : Fragment() {
             service.stopSelf()
             this.service = null
         }
+        orientationEventListener.disable()
     }
 
     override fun onDestroyView() {
@@ -318,6 +339,26 @@ class VideoFragment : Fragment() {
         Log.d(TAG, "onDestroyView")
         binding = null
     }
+
+    private fun rotateUiTo(currentOrientation: Orientation) {
+        val degrees = when (currentOrientation) {
+            Orientation.LAND_LEFT -> 90.also { Log.d(TAG, "land left") }
+            Orientation.LAND_RIGHT -> (-90).also { Log.d(TAG, "land right") }
+            Orientation.PORTRAIT -> 0.also { Log.d(TAG, "portrait") }
+        }
+        binding?.overlayText?.rotation = when (currentOrientation) {
+            Orientation.LAND_RIGHT -> -90f
+            Orientation.LAND_LEFT -> 90f
+            Orientation.PORTRAIT -> 0f
+        }
+        binding?.run {
+            listOf(btnFlash, btnPhoto, btnRecordVideo, btnSettings, btnToggleCamera, recordingTime, dotRecording, layoutRecordingTime)
+                .forEach { v ->
+                    v.animate().rotation(degrees.toFloat()).start()
+                }
+        }
+    }
+
 
     private fun debugToast(msg: String) =
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
