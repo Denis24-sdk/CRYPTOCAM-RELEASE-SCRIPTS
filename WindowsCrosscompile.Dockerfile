@@ -53,6 +53,8 @@ RUN cp /build/tools_mingw/Tools/mingw810_64/bin/libwinpthread-1.dll \
         /build/tools_mingw/Tools/mingw810_64/bin/libgcc_s_seh-1.dll \
         package/bin
 
+RUN rm -rf package/bin/libGLESv2.dll package/plugins/sqldrivers package/plugins/platforms/{qoffscreen.dll, qdirect2d.dll, qminimal.dll} package/plugins/qmltooling package/plugins/printsupport package/lib/{libqtfreetype.a, libQt5Bootstrap.a, libQt5FontDatabaseSupport.a, libQt5QmlDevTools.a, libQt5QmlDebug.a, libQt5FbSupport.a, libQt5DeviceDiscorverySupport.a, libQt5OpenGLExtensions.a} package/include package/doc
+
 RUN cp target/x86_64-pc-windows-gnu/release/cryptocam-qt.exe package/bin/CryptocamCompanion.exe
 RUN mv package CryptocamCompanion
 RUN zip -r CryptocamCompanion.zip CryptocamCompanion
