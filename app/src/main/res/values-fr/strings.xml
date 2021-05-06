@@ -51,4 +51,6 @@
     <string name="invalid_public_key">Clé non valide</string>
     <string name="key_name">Nom de la clé</string>
     <string name="import_from_string">Importer une clé au format texte</string>
+    <string name="vibrate_on_photo">Déclencheur tactile</string>
+    <string name="vibrate_on_photo_summary">Vibrer quand une photo est prise</string>
 </resources>

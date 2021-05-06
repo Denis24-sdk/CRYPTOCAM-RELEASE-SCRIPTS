@@ -50,4 +50,6 @@
     <string name="invalid_public_key">Clave inválida</string>
     <string name="key_name">Nombre de la clave</string>
     <string name="import_from_string">Importar una llave como texto</string>
+    <string name="vibrate_on_photo">Disparador háptico</string>
+    <string name="vibrate_on_photo_summary">Vibrar cuando se toma una foto</string>
 </resources>

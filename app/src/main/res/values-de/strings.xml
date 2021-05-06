@@ -51,4 +51,6 @@
     <string name="invalid_public_key">Ungültiger Schlüssel</string>
     <string name="key_name">Schlüsselname</string>
     <string name="import_from_string">Schlüssel als Text importieren</string>
+    <string name="vibrate_on_photo">Haptisches Feedback für Auslöser</string>
+    <string name="vibrate_on_photo_summary">Vibrieren wenn ein Photo gemacht wird</string>
 </resources>
