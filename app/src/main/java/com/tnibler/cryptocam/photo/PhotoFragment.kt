@@ -22,6 +22,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.addRepeatingJob
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.OutputFileManager
 import com.tnibler.cryptocam.R
@@ -36,6 +37,7 @@ import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 
 class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
@@ -115,6 +117,19 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                     Log.d(TAG, "volume key pressed")
                     takePhoto(binding)
                 }
+            }
+            if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
+                lifecycleScope.launchWhenResumed {
+                    while (true) {
+                        photoOverlayText.visibility = when (photoOverlayText.visibility) {
+                            View.VISIBLE -> View.INVISIBLE
+                            else -> View.VISIBLE
+                        }
+                        delay(1000)
+                    }
+                }
+            } else {
+                photoOverlayText.visibility = View.GONE
             }
         }
     }
