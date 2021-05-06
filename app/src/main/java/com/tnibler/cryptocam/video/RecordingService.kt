@@ -543,7 +543,4 @@ class RecordingService : Service(), LifecycleOwner {
         ) : State(selectedCamera, flashOn)
     }
 
-    enum class Orientation {
-        PORTRAIT, LAND_LEFT, LAND_RIGHT
-    }
 }
