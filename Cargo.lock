@@ -756,8 +756,8 @@ checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
 
 [[package]]
 name = "libcryptocam"
-version = "0.1.2"
-source = "git+https://gitlab.com/cryptocam/libcryptocam?tag=v0.1.2#e9bd01ddba9b5168a147110f75bc80662a1ca074"
+version = "0.1.0"
+source = "git+https://gitlab.com/cryptocam/libcryptocam?tag=v0.1.3#76f585a347e3c2ccf0d600e3404d4e38bc1f51a2"
 dependencies = [
  "ac-ffmpeg",
  "age",
