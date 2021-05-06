@@ -352,7 +352,7 @@ class VideoFragment : Fragment() {
             Orientation.PORTRAIT -> 0f
         }
         binding?.run {
-            listOf(btnFlash, btnPhoto, btnRecordVideo, btnSettings, btnToggleCamera, recordingTime, dotRecording, layoutRecordingTime)
+            listOf(btnFlash, btnPhoto, btnRecordVideo, btnSettings, btnToggleCamera, dotRecording, layoutRecordingTime)
                 .forEach { v ->
                     v.animate().rotation(degrees.toFloat()).start()
                 }
