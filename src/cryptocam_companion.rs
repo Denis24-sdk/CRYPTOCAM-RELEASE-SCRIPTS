@@ -1,4 +1,5 @@
 extern crate qmetaobject;
+use dirs_next;
 use path_slash::PathBufExt;
 use qmetaobject::*;
 use threadpool::ThreadPool;
@@ -124,6 +125,21 @@ impl CryptocamCompanion {
         self.keyringPathChanged();
         self.load_keyring();
         self.threadpool.set_num_threads(8);
+
+        let output_path = {
+            #[cfg(target_os = "windows")]
+            {
+                dirs_next::desktop_dir()
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                dirs_next::home_dir()
+            }
+        };
+        if let Some(output_path) = output_path {
+            self.output_path = output_path.to_string_lossy().to_string().into();
+            self.outputPathChanged();
+        }
     }
 
     fn load_keyring(&mut self) {
