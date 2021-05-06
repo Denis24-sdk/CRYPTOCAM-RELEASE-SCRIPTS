@@ -216,6 +216,7 @@ class VideoFragment : Fragment() {
                     btnSettings.visibility = View.VISIBLE
                     btnToggleCamera.visibility = View.VISIBLE
                     btnRecordVideo.visibility = View.INVISIBLE
+                    btnPhoto.visibility = View.VISIBLE
                 }
                 is RecordingService.State.Recording -> {
                     val d = state.recordingTime
@@ -239,6 +240,7 @@ class VideoFragment : Fragment() {
                     btnToggleCamera.visibility = View.INVISIBLE
                     btnRecordVideo.visibility = View.VISIBLE
                     btnRecordVideo.setImageResource(R.drawable.ic_stop_video)
+                    btnPhoto.visibility = View.INVISIBLE
                 }
                 is RecordingService.State.ReadyToRecord -> {
                     dotRecording.clearAnimation()
@@ -254,6 +256,7 @@ class VideoFragment : Fragment() {
                     )
                     btnRecordVideo.visibility = View.VISIBLE
                     btnRecordVideo.setImageResource(R.drawable.ic_record_video)
+                    btnPhoto.visibility = View.VISIBLE
                 }
             }
         }
