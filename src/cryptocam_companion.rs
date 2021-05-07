@@ -290,10 +290,22 @@ impl CryptocamCompanion {
             _ => true,
         });
         let urls = urls.to_string();
-        let urls: Vec<&str> = urls.split(' ').collect();
+        let urls: Vec<&str> = urls.split(' ').filter(|s| !s.is_empty()).collect();
         for url in urls {
-            let url = Url::parse(url.to_string().as_str()).unwrap();
-            let path = urlencoding::decode(url.path()).unwrap();
+            let url = match Url::parse(url.to_string().as_str()) {
+                Err(e) => {
+                    println!("Error parsing url {}: {}", url, e);
+                    continue;
+                }
+                Ok(url) => url,
+            };
+            let path = match urlencoding::decode(url.path()) {
+                Ok(p) => p,
+                Err(e) => {
+                    println!("Error decoring url {}: {}", url, e);
+                    continue;
+                }
+            };
             let path = {
                 #[cfg(target_os = "windows")]
                 {
@@ -304,7 +316,7 @@ impl CryptocamCompanion {
                     PathBuf::from(path)
                 }
             };
-            println!("path: {}", path.to_string_lossy());
+            println!("Adding input path: {}", path.to_string_lossy());
             if self
                 ._files
                 .iter()
@@ -393,6 +405,7 @@ impl CryptocamCompanion {
             let mut decryption_job = match decrypt(file, &mut keyring, out_path.clone()) {
                 Err(error) => match error.downcast::<DecryptionError>() {
                     Err(other_error) => {
+                        println!("Unknown error at index {}: {}", index, other_error);
                         let status = FileStatus::Error(other_error.to_string());
                         self.set_file_status(index, status);
                         continue;
@@ -410,6 +423,7 @@ impl CryptocamCompanion {
                             continue;
                         }
                         other => {
+                            println!("Unknown decryption error at index {}: {}", index, other);
                             let status = FileStatus::Error(other.to_string());
                             self.set_file_status(index, status);
                             continue;
@@ -442,6 +456,10 @@ impl CryptocamCompanion {
                     }
 
                     fn on_error(&mut self, error: Box<dyn Error>) {
+                        println!(
+                            "Error during decryption at index {}: {}",
+                            self.file_index, error
+                        );
                         (*self.set_file_status)((
                             self.file_index,
                             FileStatus::Error(error.to_string()),
