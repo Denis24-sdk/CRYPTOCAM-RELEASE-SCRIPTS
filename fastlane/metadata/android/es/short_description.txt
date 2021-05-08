@@ -1,1 +1,1 @@
-Graba vídeo cifrado para proteger material sensible.
+Graba vídeo y toma fotos cifrados para proteger material sensible.

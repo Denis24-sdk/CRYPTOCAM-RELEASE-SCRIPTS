@@ -1,4 +1,4 @@
-Cryptocam ermöglicht es, live-verschlüsselte Videoaufnahmen anzufertigen, sodass sie sicher vor
+Cryptocam ermöglicht es, verschlüsselte Videos und Fotos anzufertigen, sodass sie sicher vor
 Zugriff durch einen Angreifer mit physischem Zugriff auf dein Gerät oder deine Speicherkarte sind.
 
 <h3>Eine komplette Anleitung ist auf <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io/de</a>

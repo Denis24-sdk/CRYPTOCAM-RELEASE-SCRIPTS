@@ -1,4 +1,4 @@
-Cryptocam le permite grabar vídeos encriptados para que sus grabaciones estén seguras incluso si un atacante obtiene
+Cryptocam le permite grabar vídeos y tomar fotos encriptados para que sus grabaciones estén seguras incluso si un atacante obtiene
 acceso físico a su dispositivo o tarjeta SD.
 
 <h3>Encuentra un tutorial completo en <a href="https://cryptocam.gitlab.io">https://cryptocam.gitlab.io</a></h3>

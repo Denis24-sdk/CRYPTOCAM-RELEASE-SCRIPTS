@@ -1,1 +1,1 @@
-Cryptocam - encrypted video recording
+Cryptocam - encrypting camera app

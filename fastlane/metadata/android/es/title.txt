@@ -1,1 +1,1 @@
-Cryptocam - grabación de vídeo cifrado
+Cryptocam - cámara que encripta videos y fotos
