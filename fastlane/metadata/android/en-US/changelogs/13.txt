@@ -1,0 +1,3 @@
+New feature: Photo mode!
+
+Note: decrypting photos requires a new version of the companion apps.
