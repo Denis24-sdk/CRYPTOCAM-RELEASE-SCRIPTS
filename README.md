@@ -71,7 +71,7 @@ Planned:
 - [x] ~~Graphical tool to decrypt videos on desktop~~
 - In the app:
   - [x] ~~Ability to record in the background~~
-  - [ ] Photo mode
+  - [x] ~~Photo mode~~
 - [ ] An Android app to manage keys and decrypt videos
 
 ## Contributing
