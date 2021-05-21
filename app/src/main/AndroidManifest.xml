@@ -39,6 +39,18 @@
             android:foregroundServiceType="camera|microphone">
 
         </service>
+        
+        <service android:name=".RecordTileService"
+            android:icon="@drawable/ic_videocam"
+            android:label="@string/tile_start_recording"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true"/>
+        </service>
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />

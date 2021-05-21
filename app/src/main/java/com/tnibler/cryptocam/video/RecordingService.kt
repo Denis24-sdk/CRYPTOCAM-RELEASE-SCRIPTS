@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.SensorManager
 import android.net.Uri
 import android.os.*
+import android.service.quicksettings.TileService
 import android.util.Log
 import android.util.Size
 import android.view.OrientationEventListener
@@ -27,6 +29,7 @@ import com.tnibler.cryptocam.*
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.zhuinden.simplestackextensions.servicesktx.get
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +41,7 @@ class RecordingService : Service(), LifecycleOwner {
     private val TAG = javaClass.simpleName
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private val binder = RecordingServiceBinder()
+    private var isBound = false
     private val notificationManager by lazy { NotificationManagerCompat.from(this) }
     private val notificationId = 1
     private val notificationBuilder by lazy {
@@ -93,6 +97,8 @@ class RecordingService : Service(), LifecycleOwner {
 
     private var lastVibrateFeedback = 0L
     private var isInForeground = false
+    private var startRecordingAction = false
+    private var stopServiceAfterRecording = false
 
     private fun buildOrientationEventListener(): OrientationEventListener {
         return object : OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
@@ -134,7 +140,7 @@ class RecordingService : Service(), LifecycleOwner {
 
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         orientationEventListener.enable()
-
+        (applicationContext as App).recordingService = this
     }
 
     override fun onDestroy() {
@@ -142,10 +148,50 @@ class RecordingService : Service(), LifecycleOwner {
         Log.d(TAG, "onDestroy()")
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         orientationEventListener.disable()
+        (applicationContext as App).recordingService = null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand()")
+        if (intent?.action == ACTION_TOGGLE_RECORDING) {
+            Log.d(TAG, "ACTION_TOGGLE_RECORDING")
+            startRecordingAction = true
+            stopServiceAfterRecording = true
+            Log.d(TAG, "stopServiceAfterRecording = true")
+            if (_state.value is State.ReadyToRecord || _state.value is State.NotReadyToRecord) {
+                if (!isBound) {
+                    Log.d(TAG, "Service not bound, foregrounding")
+                    foreground()
+                } else {
+                    // the service is started with startForeground() on Android >= O, so we need to call
+                    // startForeground() in here even if we don't want to be in foreground.
+                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
+                        foreground()
+                        background()
+                    }
+                }
+            }
+            when (_state.value) {
+                is State.Recording -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        TileService.requestListeningState(
+                            this,
+                            ComponentName(this, RecordTileService::class.java)
+                        )
+                    }
+                    toggleRecording()
+                }
+                is State.NotReadyToRecord -> {
+                    Log.d(TAG, "Initializing from onStartCommand")
+                    val app = (applicationContext as App)
+                    val keyManager: KeyManager = app.globalServices.get()
+                    init(keyManager.selectedRecipients.value)
+                }
+                is State.ReadyToRecord -> {
+                    toggleRecording()
+                }
+            }
+        }
         return START_REDELIVER_INTENT
     }
 
@@ -198,6 +244,9 @@ class RecordingService : Service(), LifecycleOwner {
                     RecordingManager.State.NOT_RECORDING -> currentState
                 }
             }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            TileService.requestListeningState(this, ComponentName(this, RecordTileService::class.java))
         }
     }
 
@@ -294,6 +343,7 @@ class RecordingService : Service(), LifecycleOwner {
             TAG,
             "Building videoCapture with resolution=$resolution, targetRotation=$surfaceRotation"
         )
+        Log.d(TAG, "Framerate: ${cameraSettings.frameRate}")
         val videoCaptureBuilder = VideoStreamCapture.Builder()
             .setVideoFrameRate(cameraSettings.frameRate)
             .setCameraSelector(cameraSelector)
@@ -369,6 +419,12 @@ class RecordingService : Service(), LifecycleOwner {
             ContextCompat.getMainExecutor(this),
             lifecycleScope,
             outputFileManager!!,
+            recordingStoppedCallback = {
+                if (stopServiceAfterRecording) {
+                    Log.d(TAG, "recordingStoppedCallback: stopSelf()")
+                    stopSelf()
+                }
+            },
             videoPacketCallback = {
                 val now = System.currentTimeMillis()
                 if (shouldVibrate && now - lastVibrateFeedback >= FEEDBACK_INTERVAL) {
@@ -392,8 +448,9 @@ class RecordingService : Service(), LifecycleOwner {
                     if (!(application as App).startedRecordingOnLaunch && sharedPreferences.getBoolean(
                             SettingsFragment.PREF_RECORD_ON_START,
                             false
-                        )
+                        ) || startRecordingAction
                     ) {
+                        startRecordingAction = false
                         delay(400)
                         (application as App).startedRecordingOnLaunch = true
                         toggleRecording()
@@ -509,11 +566,23 @@ class RecordingService : Service(), LifecycleOwner {
     override fun getLifecycle(): Lifecycle = lifecycleRegistry
 
     override fun onBind(intent: Intent?): IBinder {
+        isBound = true
+        Log.d(TAG, "stopServiceAfterRecording = false")
+        stopServiceAfterRecording = false
         return binder
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        isBound = false
+        return super.onUnbind(intent)
     }
 
     private fun debugToast(msg: String) =
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    companion object {
+        const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording"
+    }
 
     inner class RecordingServiceBinder : Binder() {
         val service: RecordingService

@@ -52,4 +52,6 @@
     <string name="import_from_string">Importar una llave como texto</string>
     <string name="vibrate_on_photo">Disparador háptico</string>
     <string name="vibrate_on_photo_summary">Vibrar cuando se toma una foto</string>
+    <string name="tile_start_recording">Empezar la grabación</string>
+    <string name="tile_stop_recording">Detener la grabación</string>
 </resources>

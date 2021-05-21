@@ -53,4 +53,6 @@
     <string name="import_from_string">Importer une clé au format texte</string>
     <string name="vibrate_on_photo">Déclencheur tactile</string>
     <string name="vibrate_on_photo_summary">Vibrer quand une photo est prise</string>
+    <string name="tile_start_recording">Enregistrement</string>
+    <string name="tile_stop_recording">Arrêter l\'enregistrement</string>
 </resources>

@@ -20,6 +20,7 @@ class RecordingManager(
     private val executor: Executor,
     private val coroutineScope: CoroutineScope,
     private val outputFileManager: OutputFileManager,
+    private val recordingStoppedCallback: (() -> Unit),
     private val videoPacketCallback: (() -> Unit)? = null
 ) {
     private val TAG = javaClass.simpleName
@@ -55,6 +56,7 @@ class RecordingManager(
     private fun onRecordingFinished() {
         videoFile?.close()
         Log.d(TAG, "muxer closed")
+        recordingStoppedCallback()
         coroutineScope.launch {
             setUp()
         }

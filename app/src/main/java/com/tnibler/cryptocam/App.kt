@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.video.RecordingService
 import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestackextensions.servicesktx.add
 
@@ -14,6 +15,7 @@ class App : Application() {
     var startedRecordingOnLaunch = false
     lateinit var globalServices: GlobalServices
         private set
+    var recordingService: RecordingService? = null
 
     override fun onCreate() {
         super.onCreate()
