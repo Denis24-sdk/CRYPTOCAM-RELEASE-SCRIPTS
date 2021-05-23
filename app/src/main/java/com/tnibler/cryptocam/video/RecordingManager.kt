@@ -42,6 +42,7 @@ class RecordingManager(
             override fun videoBufferReady(data: ByteArray, presentationTimeUs: Long) {
                 encryptingHandler.post {
                     videoFile?.writeVideoBuffer(data, presentationTimeUs)
+                    videoPacketCallback?.invoke()
                 }
             }
 
