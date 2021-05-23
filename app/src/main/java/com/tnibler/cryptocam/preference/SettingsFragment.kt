@@ -41,26 +41,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }
 
-        val outputDirPreference = Preference(context)
-        outputDirPreference.key =
-            PREF_OUTPUT_DIRECTORY
-        outputDirPreference.title = getString(R.string.pref_output_directory)
-        outputDirPreference.summary = getString(R.string.pref_output_directory_summary)
-        outputDirPreference.setIcon(R.drawable.ic_folder)
-        outputDirPreference.setOnPreferenceClickListener {
-            requestDirectory.launch(null)
-            true
+        val outputDirPreference = Preference(context).apply {
+            key =
+                PREF_OUTPUT_DIRECTORY
+            title = getString(R.string.pref_output_directory)
+            summary = getString(R.string.pref_output_directory_summary)
+            setIcon(R.drawable.ic_folder)
+            setOnPreferenceClickListener {
+                requestDirectory.launch(null)
+                true
+            }
         }
         screen.addPreference(outputDirPreference)
 
-        val keyPreference = Preference(context)
-        keyPreference.key = PREF_SELECTED_RECIPIENTS
-        keyPreference.title = getString(R.string.pref_keys)
-        keyPreference.summary = getString(R.string.pref_keys_summary)
-        keyPreference.setIcon(R.drawable.ic_key)
-        keyPreference.setOnPreferenceClickListener {
-            backstack.goTo(KeysKey())
-            true
+        val keyPreference = Preference(context).apply {
+            key = PREF_SELECTED_RECIPIENTS
+            title = getString(R.string.pref_keys)
+            summary = getString(R.string.pref_keys_summary)
+            setIcon(R.drawable.ic_key)
+            setOnPreferenceClickListener {
+                backstack.goTo(KeysKey())
+                true
+            }
         }
         screen.addPreference(keyPreference)
 
@@ -68,90 +70,95 @@ class SettingsFragment : PreferenceFragmentCompat() {
             setDefaultValue("30")
             entries = arrayOf("30 fps", "60 fps")
             entryValues = arrayOf("30", "60")
+            title = getString(R.string.video_framerate)
+            key = PREF_FRAMERATE
+            setValueIndex(0)
+            isPersistent = true
+            setIcon(R.drawable.ic_timer)
+            onPreferenceChangeListener = Preference.OnPreferenceChangeListener { preference, newValue ->
+                summary = "$newValue fps"
+                (preference as ListPreference).value = newValue as String
+                true
+            }
         }
-        fpsPreference.title = getString(R.string.video_framerate)
-        fpsPreference.key = PREF_FRAMERATE
-        fpsPreference.setValueIndex(0)
-        fpsPreference.isPersistent = true
-        fpsPreference.setIcon(R.drawable.ic_timer)
         screen.addPreference(fpsPreference)
-        fpsPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { preference, newValue ->
-            fpsPreference.summary = "$newValue fps"
-            (preference as ListPreference).value = newValue as String
-            true
-        }
         fpsPreference.summary = "${fpsPreference.value} fps"
 
         val resolutionPreference = ListPreference(context).apply {
             setDefaultValue(DEFAULT_RESOLUTION)
             entries = arrayOf("1280x720", "1920x1080", "3840x2160")
             entryValues = entries
-        }
-        resolutionPreference.title = getString(R.string.video_resolution)
-        resolutionPreference.key = PREF_VIDEO_RESOLUTION
-        resolutionPreference.setOnPreferenceChangeListener { preference, newValue ->
-            (preference as ListPreference).value = newValue as String
-            resolutionPreference.summary = getString(R.string.video_resolution_summary, newValue)
-            true
+            title = getString(R.string.video_resolution)
+            key = PREF_VIDEO_RESOLUTION
+            setOnPreferenceChangeListener { preference, newValue ->
+                (preference as ListPreference).value = newValue as String
+                summary = getString(R.string.video_resolution_summary, newValue)
+                true
+            }
         }
 
         screen.addPreference(resolutionPreference)
         resolutionPreference.summary =
-            getString(R.string.video_resolution_summary, resolutionPreference.value as String)
+            getString(R.string.video_resolution_summary, resolutionPreference.value)
 
-        val overlayPreference = CheckBoxPreference(context)
-        overlayPreference.setDefaultValue(false)
-        overlayPreference.key = PREF_OVERLAY
-        overlayPreference.title = getString(R.string.enable_overlay)
-        overlayPreference.summary = getString(R.string.enable_overlay_summary)
+        val overlayPreference = CheckBoxPreference(context).apply {
+            setDefaultValue(false)
+            key = PREF_OVERLAY
+            title = getString(R.string.enable_overlay)
+            summary = getString(R.string.enable_overlay_summary)
+        }
 
         screen.addPreference(overlayPreference)
 
-        val recordOnStartPreference = CheckBoxPreference(context)
-        recordOnStartPreference.setDefaultValue(false)
-        recordOnStartPreference.key = PREF_RECORD_ON_START
-        recordOnStartPreference.title = getString(R.string.record_on_start)
-        recordOnStartPreference.summary = getString(R.string.record_on_start_summary)
+        val recordOnStartPreference = CheckBoxPreference(context).apply {
+            setDefaultValue(false)
+            key = PREF_RECORD_ON_START
+            title = getString(R.string.record_on_start)
+            summary = getString(R.string.record_on_start_summary)
+        }
 
         screen.addPreference(recordOnStartPreference)
 
-        val vibrateWhileRecordingPreference = CheckBoxPreference(context)
-        vibrateWhileRecordingPreference.setDefaultValue(true)
-        vibrateWhileRecordingPreference.key = PREF_VIBRATE_WHILE_RECORDING
-        vibrateWhileRecordingPreference.title = getString(R.string.vibrate_while_recording)
-        vibrateWhileRecordingPreference.summary =
-            getString(R.string.vibrate_while_recording_summary)
+        val vibrateWhileRecordingPreference = CheckBoxPreference(context).apply {
+            setDefaultValue(true)
+            key = PREF_VIBRATE_WHILE_RECORDING
+            title = getString(R.string.vibrate_while_recording)
+            summary =
+                getString(R.string.vibrate_while_recording_summary)
 
+        }
         screen.addPreference(vibrateWhileRecordingPreference)
 
-        val vibrateOnPhotoPreference = CheckBoxPreference(context)
-        vibrateOnPhotoPreference.setDefaultValue(true)
-        vibrateOnPhotoPreference.key = PREF_VIBRATE_ON_PHOTO
-        vibrateOnPhotoPreference.title = getString(R.string.vibrate_on_photo)
-        vibrateOnPhotoPreference.summary = getString(R.string.vibrate_on_photo_summary)
+        val vibrateOnPhotoPreference = CheckBoxPreference(context).apply {
+            setDefaultValue(true)
+            key = PREF_VIBRATE_ON_PHOTO
+            title = getString(R.string.vibrate_on_photo)
+            summary = getString(R.string.vibrate_on_photo_summary)
+        }
 
         screen.addPreference(vibrateOnPhotoPreference)
 
-        val tutorialPreference = Preference(context)
-        tutorialPreference.key = "tutorial"
-        tutorialPreference.title = getString(R.string.open_tutorial_site)
-//        tutorialPreference.summary = getString(R.string.tutorial_description)
-        tutorialPreference.setOnPreferenceClickListener {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse(getString(R.string.tutorial_url))
+        val tutorialPreference = Preference(context).apply {
+            key = "tutorial"
+            title = getString(R.string.open_tutorial_site)
+            setOnPreferenceClickListener {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse(getString(R.string.tutorial_url))
+                }
+                startActivity(intent)
+                true
             }
-            startActivity(intent)
-            true
         }
         screen.addPreference(tutorialPreference)
 
-        val licensePreference = Preference(context)
-        licensePreference.key = "licenses"
-        licensePreference.title = getString(R.string.licenses)
-        licensePreference.summary = getString(R.string.licenses_description)
-        licensePreference.setOnPreferenceClickListener {
-            backstack.goTo(LicensesKey())
-            true
+        val licensePreference = Preference(context).apply {
+            key = "licenses"
+            title = getString(R.string.licenses)
+            summary = getString(R.string.licenses_description)
+            setOnPreferenceClickListener {
+                backstack.goTo(LicensesKey())
+                true
+            }
         }
         screen.addPreference(licensePreference)
 
