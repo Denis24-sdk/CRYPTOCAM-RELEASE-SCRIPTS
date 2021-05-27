@@ -54,4 +54,13 @@
     <string name="vibrate_on_photo_summary">Vibrate when shutter button is pressed</string>
     <string name="tile_start_recording">Record video</string>
     <string name="tile_stop_recording">Stop recording</string>
+    <string name="enable_custom_notification">Use custom notification</string>
+    <string name="notification_app_name">Notification app name</string>
+    <string name="custom_notification_settings">Custom notification</string>
+    <string name="custom_notification_summary">Customize and disguise background recording notification</string>
+    <string name="pref_notification_title">Notification title</string>
+    <string name="pref_notification_text">Notification text</string>
+    <string name="enable_custom_notification_summary">Show custom notification during background recording to hide the fact that Cryptocam is running</string>
+    <string name="pref_notification_icon">Notification icon</string>
+    <string name="pref_notification_style">Notification style</string>
 </resources>

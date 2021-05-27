@@ -15,6 +15,7 @@ import android.util.Log
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
+import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -44,31 +45,7 @@ class RecordingService : Service(), LifecycleOwner {
     private var isBound = false
     private val notificationManager by lazy { NotificationManagerCompat.from(this) }
     private val notificationId = 1
-    private val notificationBuilder by lazy {
-        val resultIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent =
-            PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
-                Notification.Builder(this, App.CHANNEL_ID)
-                    .setContentTitle(getString(R.string.notification_title))
-                    .setContentText(getString(R.string.notification_text))
-                    .setContentIntent(pendingIntent)
-                    .setOngoing(true)
-                    .setLocalOnly(true)
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
-            }
-            else -> {
-                Notification.Builder(this)
-                    .setContentTitle(getString(R.string.notification_title))
-                    .setContentText(getString(R.string.notification_text))
-                    .setContentIntent(pendingIntent)
-                    .setOngoing(true)
-                    .setLocalOnly(true)
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
-            }
-        }
-    }
+    private val notificationBuilder by lazy { notificationBuilder(this) }
 
     private var recipients: Collection<KeyManager.X25519Recipient> = setOf()
     private var outputFileManager: OutputFileManager? = null
@@ -561,6 +538,11 @@ class RecordingService : Service(), LifecycleOwner {
         ) ?: SettingsFragment.DEFAULT_RESOLUTION
         val s = r.split("x")
         return Size(s[0].toInt(), s[1].toInt())
+    }
+
+    private fun buildNotificationRemoteViews(): RemoteViews {
+        val remoteView = RemoteViews(packageName, R.layout.custom_notification_pixel)
+        return remoteView
     }
 
     override fun getLifecycle(): Lifecycle = lifecycleRegistry

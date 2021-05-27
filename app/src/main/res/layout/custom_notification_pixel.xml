@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/customNotificationIcon"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_alignTop="@id/customNotificationAppName"
+        android:layout_alignBottom="@id/customNotificationAppName"
+        android:src="@drawable/ic_videocam"/>
+
+    <TextView
+        android:id="@+id/customNotificationAppName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification.Info"
+        android:layout_marginStart="4dp"
+        android:layout_toEndOf="@id/customNotificationIcon"
+        tools:text="App name"/>
+
+    <TextView
+        android:id="@+id/customNotificationTitleView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/customNotificationAppName"
+        android:layout_marginTop="8dp"
+        android:textAppearance="@android:style/TextAppearance.StatusBar.EventContent.Title"
+        tools:text="Notification title"/>
+
+    <TextView
+        android:id="@+id/customNotificationTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/customNotificationTitleView"
+        android:layout_marginTop="0dp"
+        android:textAppearance="@android:style/TextAppearance.Material.Notification"
+        tools:text="Notification text here"/>
+</RelativeLayout>

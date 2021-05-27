@@ -7,10 +7,7 @@ import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
-import androidx.preference.CheckBoxPreference
-import androidx.preference.ListPreference
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.*
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.keys.keyList.KeysKey
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
@@ -138,6 +135,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         screen.addPreference(vibrateOnPhotoPreference)
 
+        val customNotificationPreference = Preference(context).apply {
+            key = "customNotification"
+            setTitle(R.string.custom_notification_settings)
+            setSummary(R.string.custom_notification_summary)
+            setOnPreferenceClickListener {
+                backstack.goTo(CustomNotificationSettingsKey())
+                true
+            }
+        }
+        screen.addPreference(customNotificationPreference)
+
         val tutorialPreference = Preference(context).apply {
             key = "tutorial"
             title = getString(R.string.open_tutorial_site)
@@ -174,6 +182,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
         const val PREF_VIBRATE_ON_PHOTO = "vibrateOnPhoto"
         const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
+
+        const val PREF_CUSTOMIZE_NOTIFICATION = "customizeNotification"
+        const val PREF_CUSTOM_NOTIFICATION_APP_NAME = "customNotificationAppName"
+        const val PREF_CUSTOM_NOTIFICATION_TITLE = "customNotificationTitle"
+        const val PREF_CUSTOM_NOTIFICATION_TEXT = "customNotificationText"
+        const val PREF_CUSTOM_NOTIFICATION_ICON = "customNotificationIcon"
+        const val PREF_CUSTOM_NOTIFICATION_STYLE = "customNotificationStyle"
 
         const val SHOWED_BACKGROUND_RECORDING_INFO = "showedBackgroundRecordingInfo"
         const val SHOWED_TUTORIAL_INFO = "showedWebsiteTutorialInfo"
