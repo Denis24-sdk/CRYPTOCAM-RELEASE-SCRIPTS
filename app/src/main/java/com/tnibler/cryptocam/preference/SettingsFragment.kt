@@ -166,7 +166,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     companion object {
-        private const val REQUEST_PICK_DIRECTORY = 8735
         const val PREF_OUTPUT_DIRECTORY = "mediaOutputLocation"
         const val PREF_FRAMERATE = "videoFramerate"
         const val PREF_VIDEO_RESOLUTION = "videoResolution"
