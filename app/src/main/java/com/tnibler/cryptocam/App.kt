@@ -22,12 +22,14 @@ class App : Application() {
             val name = getString(R.string.notification_channel_name)
             val descriptionText = getString(R.string.notification_channel_description)
             val importance = NotificationManager.IMPORTANCE_MIN
-            val mChannel = NotificationChannel(CHANNEL_ID, name, importance)
-            mChannel.description = descriptionText
+            val channel = NotificationChannel(CHANNEL_ID, name, importance)
+            channel.description = descriptionText
+            channel.enableLights(false)
+            channel.enableVibration(false)
             // Register the channel with the system; you can't change the importance
             // or other notification behaviors after this
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(mChannel)
+            notificationManager.createNotificationChannel(channel)
         }
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
         if (!sharedPreferences.getBoolean(SettingsFragment.PREF_RECORD_ON_START, false)) {
