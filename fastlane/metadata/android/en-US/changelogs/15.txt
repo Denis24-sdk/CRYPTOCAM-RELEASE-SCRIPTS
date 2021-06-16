@@ -1,0 +1,3 @@
+New features:
+ - Quick settings tile button to start/stop recording
+ - Customizable notification to disguise Cryptocam as another app while it's recording
