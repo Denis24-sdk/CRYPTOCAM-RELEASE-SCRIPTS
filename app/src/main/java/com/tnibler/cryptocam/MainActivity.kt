@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     private lateinit var binding: ActivityMainBinding
     private lateinit var fragmentStateChanger: DefaultFragmentStateChanger
     private lateinit var sharedPreferences: SharedPreferences
+    private var isNavigationSetUp = false
     private val keyManager by lazy { (application as App).globalServices.get<KeyManager>() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,31 +65,7 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
 
         fragmentStateChanger = DefaultFragmentStateChanger(supportFragmentManager, R.id.container)
-
-        val action = intent?.action
-        val data = intent?.data
-        Log.d(TAG, "action $action, data $data")
-        if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
-            // import key from deep link qr code
-            val recipient = parseImportUri(data.toString())
-            if (recipient == null) {
-                regularStart()
-                return
-            }
-            val firstKey = if (outputDirExists()) {
-                VideoKey()
-            } else {
-                PickOutputDirKey()
-            }
-            val initialHistory = listOf(firstKey, KeysKey(recipient))
-            Navigator.configure()
-                .setGlobalServices((application as App).globalServices)
-                .setScopedServices(DefaultServiceProvider())
-                .setStateChanger(SimpleStateChanger(this@MainActivity))
-                .install(this@MainActivity, findViewById(R.id.container), initialHistory)
-        } else {
-            regularStart()
-        }
+        handleIntent(intent)
     }
 
     private fun regularStart() {
@@ -110,6 +87,7 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
             .setScopedServices(DefaultServiceProvider())
             .setStateChanger(SimpleStateChanger(this@MainActivity))
             .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+        isNavigationSetUp = true
     }
 
     override fun onNavigationEvent(stateChange: StateChange) {
@@ -121,6 +99,48 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
             super.onBackPressed()
         }
     }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Log.d(TAG, "onNewIntent()")
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val action = intent?.action
+        val data = intent?.data
+        Log.d(TAG, "action $action, data $data")
+        if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
+            Log.d(TAG, "import key deep link")
+            // import key from deep link qr code
+            val recipient = parseImportUri(data.toString())
+            if (recipient == null) {
+                Log.d(TAG, "failed to parse import key uri")
+                regularStart()
+                return
+            }
+            val firstKey = if (outputDirExists()) {
+                VideoKey()
+            } else {
+                PickOutputDirKey()
+            }
+            val initialHistory = listOf(firstKey, KeysKey(recipient))
+            Log.d(TAG, "initial history: $initialHistory")
+            if (!isNavigationSetUp) {
+                Navigator.configure()
+                    .setGlobalServices((application as App).globalServices)
+                    .setScopedServices(DefaultServiceProvider())
+                    .setStateChanger(SimpleStateChanger(this@MainActivity))
+                    .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+                isNavigationSetUp = true
+            } else {
+                backstack.setHistory(initialHistory, StateChange.REPLACE)
+            }
+        } else {
+            regularStart()
+        }
+    }
+
 
     override fun onResume() {
         super.onResume()
@@ -141,6 +161,7 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     }
 
     fun nextOnboardingScreen(currentDestination: DefaultFragmentKey) {
+        Log.d(TAG, "nextOnboardingScreen(${currentDestination.javaClass.simpleName})")
         when (currentDestination) {
             is PickKeyKey -> {
                 if (!outputDirExists()) {
