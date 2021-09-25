@@ -4,7 +4,8 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.addRepeatingJob
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.tnibler.cryptocam.MainActivity
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.PickKeyBinding
@@ -16,6 +17,7 @@ import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 class PickKeyFragment : KeyedFragment(R.layout.pick_key) {
     private val viewModel: PickKeyViewModel by lazy { lookup() }
@@ -33,25 +35,27 @@ class PickKeyFragment : KeyedFragment(R.layout.pick_key) {
                 }
                 dialog.show(childFragmentManager, null)
             }
-            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.STARTED) {
-                viewModel.keyScanned.collect { recipient ->
-                    val dialog = EditKeyDialog(recipient) { recipient ->
-                        val success = keyManager.importRecipient(recipient)
-                        if (!success) {
-                            Toast.makeText(
-                                requireContext(),
-                                getString(R.string.import_key_fail),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.keyScanned.collect { recipient ->
+                        val dialog = EditKeyDialog(recipient) { recipient ->
+                            val success = keyManager.importRecipient(recipient)
+                            if (!success) {
+                                Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.import_key_fail),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                goNext()
+                            }
+                        }
+                        dialog.show(this@PickKeyFragment.childFragmentManager, null)
+                    }
+                    keyManager.availableKeys.collect { keys ->
+                        if (keys.isNotEmpty()) {
                             goNext()
                         }
-                    }
-                    dialog.show(this@PickKeyFragment.childFragmentManager, null)
-                }
-                keyManager.availableKeys.collect { keys ->
-                    if (keys.isNotEmpty()) {
-                        goNext()
                     }
                 }
             }

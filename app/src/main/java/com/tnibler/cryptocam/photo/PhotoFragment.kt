@@ -21,8 +21,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.addRepeatingJob
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.Orientation
 import com.tnibler.cryptocam.OutputFileManager
@@ -40,6 +40,7 @@ import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter
 import java.io.ByteArrayOutputStream
 
@@ -110,19 +111,21 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 SelectedCamera.FRONT -> R.drawable.ic_outline_camera_rear
                 SelectedCamera.BACK -> R.drawable.ic_outline_camera_front
             })
-            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.RESUMED) {
-                viewModel.flashMode.collect { flashMode ->
-                    photoBtnFlash.setImageResource(when (flashMode) {
-                        PhotoViewModel.FlashMode.AUTO -> R.drawable.ic_flash_auto
-                        PhotoViewModel.FlashMode.ON -> R.drawable.ic_flash_on
-                        PhotoViewModel.FlashMode.OFF -> R.drawable.ic_flash_off
-                    })
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    viewModel.flashMode.collect { flashMode ->
+                        photoBtnFlash.setImageResource(when (flashMode) {
+                            PhotoViewModel.FlashMode.AUTO -> R.drawable.ic_flash_auto
+                            PhotoViewModel.FlashMode.ON -> R.drawable.ic_flash_on
+                            PhotoViewModel.FlashMode.OFF -> R.drawable.ic_flash_off
+                        })
+                    }
                 }
-            }
-            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.RESUMED) {
-                viewModel.volumeKeyPressed.collect {
-                    Log.d(TAG, "volume key pressed")
-                    takePhoto(binding)
+                repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    viewModel.volumeKeyPressed.collect {
+                        Log.d(TAG, "volume key pressed")
+                        takePhoto(binding)
+                    }
                 }
             }
             if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {

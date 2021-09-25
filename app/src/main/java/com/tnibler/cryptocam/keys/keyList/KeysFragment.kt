@@ -5,9 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.addRepeatingJob
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.*
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.databinding.KeyListBinding
@@ -23,6 +21,7 @@ import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.zip
+import kotlinx.coroutines.launch
 
 class KeysFragment : KeyedFragment() {
     override fun onCreateView(
@@ -79,14 +78,16 @@ class KeysFragment : KeyedFragment() {
             keysFab.setOnClickListener {
                 backstack.goTo(ScannerKey())
             }
-            viewLifecycleOwner.addRepeatingJob(Lifecycle.State.STARTED) {
-                viewModel.keyScanned.collect { recipient ->
-                    showImportDialog(recipient, onCancel = {}) {
-                        adapter.submitList(keyManager.availableKeys.value.map { r ->
-                            keyManager.toDisplayItem(
-                                r
-                            )
-                        })
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.keyScanned.collect { recipient ->
+                        showImportDialog(recipient, onCancel = {}) {
+                            adapter.submitList(keyManager.availableKeys.value.map { r ->
+                                keyManager.toDisplayItem(
+                                    r
+                                )
+                            })
+                        }
                     }
                 }
             }
