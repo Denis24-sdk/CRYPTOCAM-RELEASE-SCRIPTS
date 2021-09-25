@@ -1,0 +1,3 @@
+New features:
+ - Allow removing EXIF data from photos
+ - Allow using custom names for output files
