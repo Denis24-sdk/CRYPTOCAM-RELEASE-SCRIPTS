@@ -88,8 +88,10 @@ dependencies {
     implementation 'com.github.Zhuinden:simple-stack:2.6.1'
     implementation 'com.github.Zhuinden:simple-stack-extensions:2.2.1'
     implementation 'commons-codec:commons-codec:1.15'
+    implementation 'org.apache.commons:commons-imaging:1.0-alpha2'
 
     implementation 'com.google.zxing:core:3.3.3'
+
 
     releaseImplementation 'com.github.haroldadmin:WhatTheStack:0.2.0'
 

@@ -98,6 +98,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         resolutionPreference.summary =
             getString(R.string.video_resolution_summary, resolutionPreference.value)
 
+        val removeExifPreference = CheckBoxPreference(context).apply {
+            setDefaultValue(false)
+            key = PREF_REMOVE_EXIF
+            title = getString(R.string.remove_exif_data)
+            summary = getString(R.string.remove_exif_data_summary)
+        }
+        screen.addPreference(removeExifPreference)
+
         val overlayPreference = CheckBoxPreference(context).apply {
             setDefaultValue(false)
             key = PREF_OVERLAY
@@ -196,6 +204,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
         const val PREF_VIBRATE_ON_PHOTO = "vibrateOnPhoto"
         const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
+        const val PREF_REMOVE_EXIF = "removeExifData"
 
         const val PREF_CUSTOMIZE_NOTIFICATION = "customizeNotification"
         const val PREF_CUSTOM_NOTIFICATION_APP_NAME = "customNotificationAppName"

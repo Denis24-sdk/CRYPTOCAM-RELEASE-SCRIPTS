@@ -33,12 +33,15 @@ import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.preference.SettingsKey
+import com.tnibler.cryptocam.util.ByteBufferInputStream
 import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragments.KeyedFragment
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter
+import java.io.ByteArrayOutputStream
 
 class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     private val TAG = javaClass.simpleName
@@ -239,14 +242,28 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         val callback = object : ImageCapture.OnImageCapturedCallback() {
             @ExperimentalGetImage
             override fun onCaptureSuccess(imageProxy: ImageProxy) {
+                // TODO do this asynchronously
                 val image = imageProxy.image ?: return
                 if (image.format != ImageFormat.JPEG) {
                     throw IllegalArgumentException("Image format ${image.format} not supported")
                 }
+                val removeExif =
+                    sharedPreferences.getBoolean(SettingsFragment.PREF_REMOVE_EXIF, false)
                 val imageBuffer = image.planes[0].buffer
-                val buf = ByteArray(imageBuffer.remaining())
-                imageBuffer.get(buf)
-                imageFile.write(buf)
+
+                if (removeExif) {
+                    val exifRewriter = ExifRewriter()
+                    val bufferInput = ByteBufferInputStream(imageBuffer)
+                    val out = ByteArrayOutputStream(imageBuffer.remaining())
+                    exifRewriter.removeExifMetadata(bufferInput, out)
+                    imageFile.write(out.toByteArray())
+                }
+                else {
+                    val buf = ByteArray(imageBuffer.remaining())
+                    imageBuffer.get(buf)
+                    imageFile.write(buf)
+                }
+
                 imageFile.close()
                 imageProxy.close()
                 binding.photoFeedbackView.visibility = View.GONE

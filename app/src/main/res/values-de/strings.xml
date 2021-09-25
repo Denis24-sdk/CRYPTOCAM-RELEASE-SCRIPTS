@@ -66,4 +66,6 @@
     <string name="pref_notification_style">Benachrichtigunsstil</string>
     <string name="output_file_name">Muster für Ausgabedateinamen</string>
     <string name="filename_pattern_description">"Muster nach welchem Dateinamen generiert werden. Variablen: "</string>
+    <string name="remove_exif_data">Fotometadaten entfernen</string>
+    <string name="remove_exif_data_summary">Auch ohne EXIF-Daten zu löschen sind diese verschlüsselt und nicht ohne den Schlüssel lesbar</string>
 </resources>
