@@ -55,6 +55,15 @@
     <string name="vibrate_on_photo_summary">Vibrieren wenn ein Photo gemacht wird</string>
     <string name="tile_start_recording">Aufnahme</string>
     <string name="tile_stop_recording">Aufnahme stoppen</string>
+    <string name="enable_custom_notification">Benachrichtigung anpassen</string>
+    <string name="notification_app_name">Appname</string>
+    <string name="custom_notification_settings">Benachrichtigung anpassen</string>
+    <string name="custom_notification_summary">Benachrichtigung anpassen und verschleiern</string>
+    <string name="pref_notification_title">Titel</string>
+    <string name="pref_notification_text">Text</string>
+    <string name="enable_custom_notification_summary">Benachrichtigung während der Aufnahme anpassen um Cryptocam zu verschleiern</string>
+    <string name="pref_notification_icon">Symbol</string>
+    <string name="pref_notification_style">Benachrichtigunsstil</string>
     <string name="output_file_name">Muster für Ausgabedateinamen</string>
     <string name="filename_pattern_description">"Muster nach welchem Dateinamen generiert werden. Variablen: "</string>
 </resources>
