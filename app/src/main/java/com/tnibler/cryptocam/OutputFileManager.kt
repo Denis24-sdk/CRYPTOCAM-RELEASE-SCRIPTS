@@ -2,8 +2,10 @@ package com.tnibler.cryptocam
 
 import android.content.ContentResolver
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
+import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.video.AudioInfo
@@ -14,7 +16,9 @@ import org.json.JSONObject
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.time.Clock
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
@@ -22,6 +26,7 @@ class OutputFileManager(
     var outputLocation: Uri,
     var recipients: Collection<KeyManager.X25519Recipient>,
     private val contentResolver: ContentResolver,
+    private val sharedPreferences: SharedPreferences,
     private val context: Context
 ) {
     private val TAG = javaClass.simpleName
@@ -29,11 +34,11 @@ class OutputFileManager(
     fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFile {
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
-        val filename = randomFilename()
+        val filename = nextFileName()
 
         val metadata = buildVideoMetadata(videoInfo, audioInfo)
 
-        val outFile = out.createFile("application/binary", "$filename.cryptocam.age")
+        val outFile = out.createFile("application/binary", filename)
             ?: throw RuntimeException("Error creating output file")
         val outStream = contentResolver.openOutputStream(outFile.uri)
             ?: throw RuntimeException("Error opening output file")
@@ -60,7 +65,7 @@ class OutputFileManager(
         val filename = randomFilename()
         val metadata = buildImageMetadata()
 
-        val outFile = out.createFile("application/binary", "$filename.cryptocam.age")
+        val outFile = out.createFile("application/binary", filename)
             ?: throw RuntimeException("Error creating output file")
         val outStream = contentResolver.openOutputStream(outFile.uri)
             ?: throw RuntimeException("Error opening output file")
@@ -81,6 +86,26 @@ class OutputFileManager(
         ef.write(metadata)
         Log.d(TAG, "Wrote metadata")
         return ImageFile(ef)
+    }
+
+    private fun nextFileName(): String {
+        val pattern = sharedPreferences.getString("outputFileName", "cryptocam-\$num.age") ?: "\$uuid"
+        // variables: $uuid, $year, $month, $day, $hour, $min, $sec, $num
+        val currentNum = sharedPreferences.getInt("outputFileNum", 0) ?: 0
+        val newNum = currentNum + 1
+        sharedPreferences.edit {
+            putInt("outputFileNum", newNum)
+            commit()
+        }
+        val now = ZonedDateTime.now()
+        return pattern.replace("\$year", now.year.toString())
+            .replace("\$month", String.format("%02d", now.month.value))
+            .replace("\$day", String.format("%02d", now.dayOfMonth))
+            .replace("\$hour", String.format("%02d", now.hour))
+            .replace("\$min", String.format("%02d", now.minute))
+            .replace("\$sec", String.format("%02d", now.second))
+            .replace("\$uuid", UUID.randomUUID().toString())
+            .replace("\$num", String.format("%04d", newNum))
     }
 
     private fun writePlainTextHeader(out: OutputStream) {

@@ -63,4 +63,7 @@
     <string name="enable_custom_notification_summary">Show custom notification during background recording to hide the fact that Cryptocam is running</string>
     <string name="pref_notification_icon">Notification icon</string>
     <string name="pref_notification_style">Notification style</string>
+    <string name="output_file_name">Output file name pattern</string>
+    <string name="filename_pattern_variables" translatable="false">$uuid, $year, $month, $day, $hour, $min, $sec, $num</string>
+    <string name="filename_pattern_description">"Pattern to generate file names. Variables: "</string>
 </resources>

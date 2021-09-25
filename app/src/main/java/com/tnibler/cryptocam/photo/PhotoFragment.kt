@@ -49,7 +49,8 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         outputLocation = Uri.parse(sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)),
         recipients = keyManager.selectedRecipients.value,
         context = requireContext(),
-        contentResolver = requireContext().contentResolver
+        contentResolver = requireContext().contentResolver,
+        sharedPreferences = sharedPreferences
     ) }
     private var surfaceRotation = Surface.ROTATION_0
     private val orientationEventListener by lazy { buildOrientationEventListener() }

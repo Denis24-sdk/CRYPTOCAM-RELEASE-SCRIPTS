@@ -55,4 +55,6 @@
     <string name="vibrate_on_photo_summary">Vibrieren wenn ein Photo gemacht wird</string>
     <string name="tile_start_recording">Aufnahme</string>
     <string name="tile_stop_recording">Aufnahme stoppen</string>
+    <string name="output_file_name">Muster für Ausgabedateinamen</string>
+    <string name="filename_pattern_description">"Muster nach welchem Dateinamen generiert werden. Variablen: "</string>
 </resources>

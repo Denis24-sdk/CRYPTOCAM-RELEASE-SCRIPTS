@@ -384,6 +384,7 @@ class RecordingService : Service(), LifecycleOwner {
             outputLocation = Uri.parse(outputLocation),
             contentResolver = contentResolver,
             context = this,
+            sharedPreferences = sharedPreferences,
             recipients = recipients
         )
         val shouldVibrate =

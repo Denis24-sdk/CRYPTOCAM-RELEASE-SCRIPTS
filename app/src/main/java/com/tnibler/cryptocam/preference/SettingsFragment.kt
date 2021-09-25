@@ -146,6 +146,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
         screen.addPreference(customNotificationPreference)
 
+        val fileNamePreference = EditTextPreference(context).apply {
+            setDefaultValue("cryptocam-\$num.age")
+            key = "outputFileName"
+            setTitle(R.string.output_file_name)
+            setOnPreferenceChangeListener { preference, newValue ->
+                summary = newValue.toString() + "\n" + getString(R.string.filename_pattern_description)
+                true
+            }
+        }
+        screen.addPreference(fileNamePreference)
+        fileNamePreference.summary = fileNamePreference.text + "\n" +
+                getString(R.string.filename_pattern_description) +
+                getString(R.string.filename_pattern_variables)
+
         val tutorialPreference = Preference(context).apply {
             key = "tutorial"
             title = getString(R.string.open_tutorial_site)
