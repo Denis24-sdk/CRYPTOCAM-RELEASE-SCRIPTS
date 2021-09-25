@@ -62,7 +62,7 @@ class OutputFileManager(
         Log.d(TAG, "newImageFile()")
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
-        val filename = randomFilename()
+        val filename = nextFileName()
         val metadata = buildImageMetadata()
 
         val outFile = out.createFile("application/binary", filename)
@@ -168,8 +168,6 @@ class OutputFileManager(
 
     private val dateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME
     private fun dateTime() = dateTimeFormatter.format(LocalDateTime.now())
-
-    private fun randomFilename(): String = UUID.randomUUID().toString()
 
     class EncryptedFile(private val encryptedWriter: EncryptedWriter) {
         fun write(buffer: ByteArray) {
