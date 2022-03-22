@@ -18,8 +18,10 @@ import com.tnibler.cryptocam.preference.SettingsFragment
 fun notificationBuilder(context: Context): Notification.Builder {
     val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
     val resultIntent = Intent(context, MainActivity::class.java)
+    val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT > 23) PendingIntent.FLAG_IMMUTABLE else 0
     val pendingIntent =
-        PendingIntent.getActivity(context, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        PendingIntent.getActivity(context, 0, resultIntent, flags)
     val useCustomNotification = sharedPreferences.getBoolean(SettingsFragment.PREF_CUSTOMIZE_NOTIFICATION, false)
     return if (!useCustomNotification || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
         defaultNotification(context).apply {
