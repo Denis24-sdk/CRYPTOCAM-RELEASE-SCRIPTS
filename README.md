@@ -49,15 +49,16 @@ Requirements: `go`.
 
 ```shell script
 # install gomobile
-go get golang.org/x/mobile/cmd/gomobile
+go install golang.org/x/mobile/cmd/gomobile@latest
 cd path/to/cryptocam
 mkdir app/libs
 cd age-encryption
-# either add $HOME/go/bin to your path or relace the gomobile with ~/go/bin/gomobile
+# add $HOME/go/bin to your path
 gomobile init
 export ANDROID_HOME=<path> # probably $HOME/Android/Sdk
 export ANDROID_NDK_HOME=<path> # something like $HOME/Android/Sdk/ndk/23.0.7123448
 gomobile bind -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
+gomobile bind -androidapi 21 -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
 
 cd ..
 ./gradlew assembleRelease
