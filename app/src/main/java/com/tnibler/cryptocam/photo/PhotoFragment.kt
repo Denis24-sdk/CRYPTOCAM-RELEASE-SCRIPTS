@@ -121,6 +121,8 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                         })
                     }
                 }
+            }
+            lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.RESUMED) {
                     viewModel.volumeKeyPressed.collect {
                         Log.d(TAG, "volume key pressed")
