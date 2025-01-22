@@ -23,7 +23,7 @@
         app:layout_constraintBottom_toBottomOf="@id/viewFinder"
         app:layout_constraintEnd_toEndOf="@id/viewFinder"
         app:layout_constraintStart_toStartOf="@id/viewFinder"
-        android:background="#ffffff"
+        android:background="@drawable/overlay_photo_feedback"
         android:visibility="invisible"/>
 
     <ImageButton

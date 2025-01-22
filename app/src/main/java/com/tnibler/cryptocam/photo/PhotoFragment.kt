@@ -12,6 +12,7 @@ import android.util.Log
 import android.view.*
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
+import android.view.animation.Animation.AnimationListener
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.Toast
@@ -40,6 +41,8 @@ import com.zhuinden.simplestackextensions.fragmentsktx.backstack
 import com.zhuinden.simplestackextensions.fragmentsktx.lookup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter
 import java.io.ByteArrayOutputStream
@@ -130,6 +133,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                     }
                 }
             }
+            setupPhotoFeedback(binding)
             if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
                 lifecycleScope.launchWhenResumed {
                     while (true) {
@@ -228,6 +232,54 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         }
     }
 
+    private val photoFeedbackAnimation = AlphaAnimation(1.0f, 0.0f).apply {
+        duration = 500
+        fillAfter = true
+        interpolator = DecelerateInterpolator()
+    }
+
+    private fun setupPhotoFeedback(binding: PhotoScreenBinding) {
+        photoFeedbackAnimation.setAnimationListener(object : AnimationListener {
+            override fun onAnimationStart(animation: Animation?) {}
+            override fun onAnimationRepeat(animation: Animation?) {}
+
+            override fun onAnimationEnd(animation: Animation?) {
+                binding.photoFeedbackView.visibility = View.INVISIBLE
+            }
+        })
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.isTakingPhoto.filter { it }.collect {
+                    binding.btnTakePhoto.isEnabled = false
+                    binding.btnTakePhoto.alpha = 0.3f
+                }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.isTakingPhoto
+                    .drop(1) // ignore the initial value set in viewmodel
+                    .filter { !it }.collect {
+                        binding.photoFeedbackView.visibility = View.VISIBLE
+                        binding.photoFeedbackView.startAnimation(photoFeedbackAnimation)
+
+                        if (sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_ON_PHOTO, true)) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                vibrator.vibrate(VibrationEffect.createOneShot(20, 80))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                vibrator.vibrate(20)
+                            }
+                        }
+
+                        binding.btnTakePhoto.isEnabled = true
+                        binding.btnTakePhoto.alpha = 1f
+                    }
+            }
+        }
+    }
+
     private fun takePhoto(binding: PhotoScreenBinding) {
         Log.d(TAG, "takePhoto()")
         val imageCapture = imageCapture
@@ -235,18 +287,12 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
             Log.w(TAG, "ImageCapture UseCase is null in takePhoto")
             return
         }
-        if (sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_ON_PHOTO, true)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(20, 80))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(20)
-            }
-        }
         val imageFile = outputFileManager.newImageFile()
         val callback = object : ImageCapture.OnImageCapturedCallback() {
             @ExperimentalGetImage
             override fun onCaptureSuccess(imageProxy: ImageProxy) {
+                viewModel.isTakingPhoto.value = false
+
                 // TODO do this asynchronously
                 val image = imageProxy.image ?: return
                 if (image.format != ImageFormat.JPEG) {
@@ -271,11 +317,11 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
 
                 imageFile.close()
                 imageProxy.close()
-                binding.photoFeedbackView.visibility = View.GONE
                 return
             }
 
             override fun onError(exception: ImageCaptureException) {
+                viewModel.isTakingPhoto.value = false
                 Toast.makeText(requireContext(), "$exception", Toast.LENGTH_SHORT).show()
             }
         }
@@ -290,7 +336,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         // https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:camera/camera-core/src/main/java/androidx/camera/core/ImageCapture.java;drc=b61f0e09fd1f9c20f1575e78d4a2a8a15fe5c825;l=811
         // In https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:camera/camera-core/src/main/java/androidx/camera/core/ImageSaver.java;l=85;drc=ded69ff18456e1501b418d281c562bc4bb215937
         // the image is written to a temporary file on disk which must never happen
-        binding.photoFeedbackView.visibility = View.VISIBLE
+        viewModel.isTakingPhoto.value = true;
         imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()), callback)
     }
 

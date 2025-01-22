@@ -22,6 +22,7 @@ class PhotoViewModel : VolumeKeyPressListener, ScopedServices.Registered, Bundle
     val volumeKeyPressed: Flow<Unit> = eventChannel.receiveAsFlow()
     val flashMode: MutableStateFlow<FlashMode> = MutableStateFlow(FlashMode.OFF)
     var selectedCamera: SelectedCamera = SelectedCamera.BACK
+    var isTakingPhoto = MutableStateFlow(false)
 
     override fun onVolumeKeyDown() {
         scope.launch {
