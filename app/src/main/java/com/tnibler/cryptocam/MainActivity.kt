@@ -58,6 +58,8 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                         WindowManager.LayoutParams.FLAG_FULLSCREEN
             )
         }
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+
         requestWindowFeature(Window.FEATURE_NO_TITLE)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
