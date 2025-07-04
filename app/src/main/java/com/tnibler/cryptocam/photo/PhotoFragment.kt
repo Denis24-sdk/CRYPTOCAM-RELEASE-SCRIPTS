@@ -142,6 +142,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                             PhotoViewModel.FlashMode.ON -> R.drawable.ic_flash_on
                             PhotoViewModel.FlashMode.OFF -> R.drawable.ic_flash_off
                         })
+                        imageCapture?.flashMode = mapFlashMode(viewModel.flashMode.value)
                     }
                 }
             }
@@ -182,7 +183,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 }
             imageCapture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+                .setFlashMode(mapFlashMode(viewModel.flashMode.value))
                 .build()
             val cameraSelector = when (viewModel.selectedCamera) {
                 SelectedCamera.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
@@ -302,16 +303,22 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
 
     private fun takePhoto(binding: PhotoScreenBinding) {
         Log.d(TAG, "takePhoto()")
+        if (viewModel.isTakingPhoto.value) {
+            Log.d(TAG, "Already taking a photo in takePhoto")
+            return
+        }
+
         val imageCapture = imageCapture
         if (imageCapture == null) {
             Log.w(TAG, "ImageCapture UseCase is null in takePhoto")
             return
         }
-        val imageFile = outputFileManager.newImageFile()
+
         val callback = object : ImageCapture.OnImageCapturedCallback() {
             @ExperimentalGetImage
             override fun onCaptureSuccess(imageProxy: ImageProxy) {
                 viewModel.isTakingPhoto.value = false
+                val imageFile = outputFileManager.newImageFile()
 
                 // TODO do this asynchronously
                 val image = imageProxy.image ?: return
@@ -350,11 +357,7 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 Toast.makeText(requireContext(), "$exception", Toast.LENGTH_SHORT).show()
             }
         }
-        imageCapture.flashMode = when (viewModel.flashMode.value) {
-            PhotoViewModel.FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
-            PhotoViewModel.FlashMode.ON -> ImageCapture.FLASH_MODE_ON
-            PhotoViewModel.FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
-        }
+        imageCapture.flashMode = mapFlashMode(viewModel.flashMode.value)
         imageCapture.targetRotation = surfaceRotation
         // we can not use any of the ImageCapture methods that write to files
         // or to a provided OutputStream like this one
@@ -365,6 +368,13 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
         imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()), callback)
     }
 
+    private fun mapFlashMode(mode: PhotoViewModel.FlashMode): Int {
+        return when (mode) {
+            PhotoViewModel.FlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
+            PhotoViewModel.FlashMode.ON -> ImageCapture.FLASH_MODE_ON
+            PhotoViewModel.FlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
+        }
+    }
 
     override fun onStart() {
         super.onStart()
