@@ -68,4 +68,6 @@
     <string name="filename_pattern_description">"Pattern to generate file names. Variables: "</string>
     <string name="remove_exif_data">Remove photo metadata</string>
     <string name="remove_exif_data_summary">Even if you keep EXIF data, it is still encrypted and not readable without your secret key.</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
 </resources>

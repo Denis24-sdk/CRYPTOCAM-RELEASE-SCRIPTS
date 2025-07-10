@@ -21,6 +21,7 @@ import com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingKey
 import com.tnibler.cryptocam.onboarding.PickKeyKey
 import com.tnibler.cryptocam.onboarding.PickOutputDirKey
 import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
+import com.tnibler.cryptocam.photo.PhotoViewModel
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.video.VideoKey
 import com.zhuinden.simplestack.SimpleStateChanger
@@ -30,6 +31,7 @@ import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey
 import com.zhuinden.simplestackextensions.fragments.DefaultFragmentStateChanger
 import com.zhuinden.simplestackextensions.navigatorktx.backstack
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
+import com.zhuinden.simplestackextensions.servicesktx.canFind
 import com.zhuinden.simplestackextensions.servicesktx.get
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.first
@@ -143,6 +145,12 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        if (backstack.canFind<PhotoViewModel>()) {
+            backstack.lookup<PhotoViewModel>().onActivityPaused()
+        }
+    }
 
     override fun onResume() {
         super.onResume()

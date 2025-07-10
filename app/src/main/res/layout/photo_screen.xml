@@ -13,7 +13,22 @@
         app:layout_constraintBottom_toTopOf="@id/photoOverlayControls"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        tools:background="#fff"/>
+        tools:background="#fff">
+
+    </androidx.camera.view.PreviewView>
+
+    <ImageButton
+        android:id="@+id/lastPhotoBtn"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="40dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_border"
+        android:cropToPadding="true"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <View
         android:id="@+id/photoFeedbackView"

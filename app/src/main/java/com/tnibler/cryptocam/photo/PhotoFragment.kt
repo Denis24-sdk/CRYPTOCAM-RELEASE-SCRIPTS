@@ -1,5 +1,6 @@
 package com.tnibler.cryptocam.photo
 
+
 import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
@@ -32,6 +33,7 @@ import com.tnibler.cryptocam.SelectedCamera
 import com.tnibler.cryptocam.video.VideoKey
 import com.tnibler.cryptocam.databinding.PhotoScreenBinding
 import com.tnibler.cryptocam.keys.KeyManager
+import com.tnibler.cryptocam.photo.photoviewer.PhotoViewerKey
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.preference.SettingsKey
 import com.tnibler.cryptocam.util.ByteBufferInputStream
@@ -83,6 +85,24 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                 this@PhotoFragment.cameraProvider = cameraProvider
                 setUpCamera(cameraProvider, binding)
             }, ContextCompat.getMainExecutor(requireContext()))
+
+            lastPhotoBtn.setOnClickListener {
+                backstack.goTo(PhotoViewerKey())
+            }
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    viewModel.lastPhoto.collect {
+                        if (it === null) {
+                            binding.lastPhotoBtn.setImageResource(android.R.color.transparent)
+                            binding.lastPhotoBtn.visibility = View.GONE
+                        } else {
+                            binding.lastPhotoBtn.setImageBitmap(it)
+                            binding.lastPhotoBtn.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            }
+
             photoBtnSettings.setOnClickListener {
                 backstack.goTo(SettingsKey())
             }
@@ -302,18 +322,23 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
                     sharedPreferences.getBoolean(SettingsFragment.PREF_REMOVE_EXIF, false)
                 val imageBuffer = image.planes[0].buffer
 
+                val outputBytes: ByteArray
                 if (removeExif) {
                     val exifRewriter = ExifRewriter()
                     val bufferInput = ByteBufferInputStream(imageBuffer)
                     val out = ByteArrayOutputStream(imageBuffer.remaining())
                     exifRewriter.removeExifMetadata(bufferInput, out)
-                    imageFile.write(out.toByteArray())
+                    outputBytes = out.toByteArray();
                 }
                 else {
                     val buf = ByteArray(imageBuffer.remaining())
                     imageBuffer.get(buf)
-                    imageFile.write(buf)
+                    outputBytes = buf
                 }
+
+                imageFile.write(outputBytes)
+                val bitmap = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.size)
+                viewModel.lastPhoto.value = bitmap
 
                 imageFile.close()
                 imageProxy.close()
@@ -408,5 +433,4 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     companion object {
         private const val KEY_FLASH_MODE = "flashMode"
     }
-
 }
