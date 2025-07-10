@@ -28,7 +28,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 }
             }) { uri ->
                 uri ?: return@registerForActivityResult
-                preferenceManager.sharedPreferences.edit {
+                requireNotNull(preferenceManager.sharedPreferences).edit {
                     putString(PREF_OUTPUT_DIRECTORY, uri.toString())
                     commit()
                 }

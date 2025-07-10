@@ -546,7 +546,8 @@ class RecordingService : Service(), LifecycleOwner {
         return remoteView
     }
 
-    override fun getLifecycle(): Lifecycle = lifecycleRegistry
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
 
     override fun onBind(intent: Intent?): IBinder {
         isBound = true
