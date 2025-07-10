@@ -200,6 +200,9 @@ class VideoFragment : Fragment() {
                         currentCamera = state.selectedCamera
                         btnPhoto.visibility = View.INVISIBLE
                     }
+                    is RecordingService.State.NotReadyToRecord -> {
+                        // nothing
+                    }
                 }
             }
             btnFlash.setImageResource(
