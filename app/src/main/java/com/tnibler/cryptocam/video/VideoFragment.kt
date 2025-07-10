@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -379,7 +380,12 @@ class VideoFragment : Fragment() {
 
     companion object {
         val REQUIRED_PERMISSIONS =
-            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO) +
+                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.TIRAMISU) {
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        arrayOf()
+                    }
 
         fun allPermissionsGranted(context: Context) = REQUIRED_PERMISSIONS.all {
             ContextCompat.checkSelfPermission(

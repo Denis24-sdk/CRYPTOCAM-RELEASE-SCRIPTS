@@ -44,11 +44,11 @@ class PhotoViewer : KeyedFragment(R.layout.photo_viewer), OnTouchListener {
         }
 
         var isScaling = false
-        scaleGestureDetector = ScaleGestureDetector(context, object : OnScaleGestureListener {
+        scaleGestureDetector = ScaleGestureDetector(requireContext(), object : OnScaleGestureListener {
             var lastFocusX: Float = 0f
             var lastFocusY: Float = 0f
-            override fun onScale(detector: ScaleGestureDetector?): Boolean {
-                var newScale = photoView.scaleX * detector!!.scaleFactor
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                var newScale = photoView.scaleX * detector.scaleFactor
                 newScale = MathUtils.clamp(newScale, 0.25f, 50f)
                 val deltaScale = newScale / photoView.scaleX
 
@@ -68,24 +68,24 @@ class PhotoViewer : KeyedFragment(R.layout.photo_viewer), OnTouchListener {
                 return true
             }
 
-            override fun onScaleBegin(detector: ScaleGestureDetector?): Boolean {
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
                 isScaling = true
-                lastFocusX = detector!!.focusX
+                lastFocusX = detector.focusX
                 lastFocusY = detector.focusY
                 return true
             }
 
-            override fun onScaleEnd(detector: ScaleGestureDetector?) {
+            override fun onScaleEnd(detector: ScaleGestureDetector) {
                 isScaling = false
             }
         })
-        ViewConfiguration.get(context)
+        ViewConfiguration.get(requireContext())
 
 
         gestureDetector = GestureDetector(context, object : OnGestureListener {
             override fun onScroll(
                 e1: MotionEvent?,
-                e2: MotionEvent?,
+                e2: MotionEvent,
                 distanceX: Float,
                 distanceY: Float
             ): Boolean {
@@ -97,17 +97,17 @@ class PhotoViewer : KeyedFragment(R.layout.photo_viewer), OnTouchListener {
                 return true
             }
 
-            override fun onDown(e: MotionEvent?): Boolean = true
-            override fun onShowPress(e: MotionEvent?) = Unit
-            override fun onSingleTapUp(e: MotionEvent?): Boolean = true
-            override fun onLongPress(e: MotionEvent?) = Unit
-            override fun onFling(e1: MotionEvent?, e2: MotionEvent?, velocityX: Float, velocityY: Float): Boolean = true
+            override fun onDown(e: MotionEvent): Boolean = true
+            override fun onShowPress(e: MotionEvent) = Unit
+            override fun onSingleTapUp(e: MotionEvent): Boolean = true
+            override fun onLongPress(e: MotionEvent) = Unit
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean = true
         })
 
         binding.frameLayout.setOnTouchListener(this)
     }
 
-    override fun onTouch(v: View?, event: MotionEvent?): Boolean {
+    override fun onTouch(v: View?, event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
         return true
