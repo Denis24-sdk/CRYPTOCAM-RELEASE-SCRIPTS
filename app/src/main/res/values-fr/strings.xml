@@ -55,4 +55,6 @@
     <string name="vibrate_on_photo_summary">Vibrer quand une photo est prise</string>
     <string name="tile_start_recording">Enregistrement</string>
     <string name="tile_stop_recording">Arrêter l\'enregistrement</string>
+    <string name="remember_shooting_mode">Sauvegarder le mode d\'enregistrement</string>
+    <string name="remember_shooting_mode_summary">Démarrer l\'application dans le mode photo ou vidéo utilisé précedemment</string>
 </resources>

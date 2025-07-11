@@ -68,4 +68,6 @@
     <string name="filename_pattern_description">"Muster nach welchem Dateinamen generiert werden. Variablen: "</string>
     <string name="remove_exif_data">Fotometadaten entfernen</string>
     <string name="remove_exif_data_summary">Auch ohne EXIF-Daten zu löschen sind diese verschlüsselt und nicht ohne den Schlüssel lesbar</string>
+    <string name="remember_shooting_mode">Modus merken</string>
+    <string name="remember_shooting_mode_summary">Startet App im zuletzt benutzten Modus (Foto, Video)</string>
 </resources>

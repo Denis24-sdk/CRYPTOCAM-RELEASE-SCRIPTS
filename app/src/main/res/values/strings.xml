@@ -70,4 +70,6 @@
     <string name="remove_exif_data_summary">Even if you keep EXIF data, it is still encrypted and not readable without your secret key.</string>
     <string name="dummy_button">Dummy Button</string>
     <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="remember_shooting_mode">Remember shooting mode</string>
+    <string name="remember_shooting_mode_summary">Start app in last used mode (photo/video)</string>
 </resources>

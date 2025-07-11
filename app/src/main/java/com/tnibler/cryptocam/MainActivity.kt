@@ -21,6 +21,7 @@ import com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingKey
 import com.tnibler.cryptocam.onboarding.PickKeyKey
 import com.tnibler.cryptocam.onboarding.PickOutputDirKey
 import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
+import com.tnibler.cryptocam.photo.PhotoKey
 import com.tnibler.cryptocam.photo.PhotoViewModel
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.video.VideoKey
@@ -78,11 +79,14 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
             !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
         val shouldShowBackgroundRecordingInfo =
             !sharedPreferences.getBoolean(SettingsFragment.SHOWED_BACKGROUND_RECORDING_INFO, false)
+        val rememberLastShootingMode = sharedPreferences.getBoolean(SettingsFragment.PREF_REMEMBER_SHOOTING_MODE, false)
+        val lastShootingMode = sharedPreferences.getString(SettingsFragment.LAST_SHOOTING_MODE, "video")
         val initialKey = when {
             shouldShowTutorialInfo -> WebsiteInfoKey()
             shouldShowBackgroundRecordingInfo -> InfoBackgroundRecordingKey()
             keys.isEmpty() -> PickKeyKey()
             !outputDirExists() -> PickOutputDirKey()
+            rememberLastShootingMode && lastShootingMode == "photo" -> PhotoKey()
             else -> VideoKey()
         }
         val initialHistory = listOf(initialKey)

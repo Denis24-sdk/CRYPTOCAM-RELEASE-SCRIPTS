@@ -98,6 +98,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
         resolutionPreference.summary =
             getString(R.string.video_resolution_summary, resolutionPreference.value)
 
+        val rememberShootingModePreference = CheckBoxPreference(context).apply {
+            setDefaultValue(false)
+            key = PREF_REMEMBER_SHOOTING_MODE
+            title = getString(R.string.remember_shooting_mode)
+            summary = getString(R.string.remember_shooting_mode_summary)
+        }
+        screen.addPreference(rememberShootingModePreference)
+
         val removeExifPreference = CheckBoxPreference(context).apply {
             setDefaultValue(false)
             key = PREF_REMOVE_EXIF
@@ -205,6 +213,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_VIBRATE_ON_PHOTO = "vibrateOnPhoto"
         const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
         const val PREF_REMOVE_EXIF = "removeExifData"
+        const val PREF_REMEMBER_SHOOTING_MODE = "rememberShootingMode"
 
         const val PREF_CUSTOMIZE_NOTIFICATION = "customizeNotification"
         const val PREF_CUSTOM_NOTIFICATION_APP_NAME = "customNotificationAppName"
@@ -215,6 +224,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         const val SHOWED_BACKGROUND_RECORDING_INFO = "showedBackgroundRecordingInfo"
         const val SHOWED_TUTORIAL_INFO = "showedWebsiteTutorialInfo"
+        const val LAST_SHOOTING_MODE = "lastShootingMode"
 
         const val DEFAULT_RESOLUTION = "1920x1080"
     }

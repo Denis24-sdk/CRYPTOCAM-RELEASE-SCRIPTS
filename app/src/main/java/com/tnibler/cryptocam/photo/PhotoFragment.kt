@@ -22,6 +22,7 @@ import androidx.camera.core.Camera
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -379,6 +380,10 @@ class PhotoFragment : KeyedFragment(R.layout.photo_screen) {
     override fun onStart() {
         super.onStart()
         orientationEventListener.enable()
+        val rememberShootingMode = sharedPreferences.getBoolean(SettingsFragment.PREF_REMEMBER_SHOOTING_MODE, false)
+        if (rememberShootingMode) {
+            sharedPreferences.edit { putString(SettingsFragment.LAST_SHOOTING_MODE, "photo") }
+        }
     }
 
     override fun onStop() {
