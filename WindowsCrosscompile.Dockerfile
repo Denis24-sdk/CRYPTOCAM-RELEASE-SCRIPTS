@@ -17,9 +17,9 @@ ENV PATH="${PATH}:/usr/lib/qt5/bin"
 RUN mkdir build
 WORKDIR build
 
-RUN wget https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z
-RUN 7z x ffmpeg-release-full-shared.7z
-RUN mv ffmpeg-4.4-full_build-shared ffmpeg
+RUN wget https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-full_build-shared.7z
+RUN 7z x ffmpeg-6.1.1-full_build-shared.7z
+RUN mv ffmpeg-6.1.1-full_build-shared ffmpeg
 
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
