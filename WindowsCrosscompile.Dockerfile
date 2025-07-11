@@ -1,4 +1,4 @@
-FROM ubuntu:hirsute as build
+FROM ubuntu:noble as build
 
 RUN apt-get -y update
 RUN apt-get -y install wget p7zip-full curl zip
