@@ -40,7 +40,6 @@ RUN rm qt_libs/5.15.2/mingw81_64/bin/*.exe
 COPY qml ./qml
 COPY src ./src
 COPY Cargo.toml cryptocam-companion.svg build.rs ./
-RUN cargo update
 
 RUN DEP_QT_INCLUDE_PATH="/build/qt_libs/5.15.2/mingw81_64/include" DEP_QT_LIBRARY_PATH="/build/qt_libs/5.15.2/mingw81_64/lib"  CXXFLAGS="-lstdc++,-lpthread -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/lib cargo build --target x86_64-pc-windows-gnu --release
 
