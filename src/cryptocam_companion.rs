@@ -98,7 +98,7 @@ pub struct CryptocamCompanion {
     fileListModel: qt_property!(RefCell<SimpleListModel<FileItem>>; NOTIFY fileListModelChanged),
     fileListModelChanged: qt_signal!(),
     _files: Vec<InputFile>,
-    addFiles: qt_method!(fn(&mut self, urls: QString)),
+    addFiles: qt_method!(fn(&mut self, urls: QVariantList)),
     removeFile: qt_method!(fn(&mut self, index: usize)),
 
     askPassphrase: qt_signal!(identity_name: QString, error: QString),
@@ -281,16 +281,20 @@ impl CryptocamCompanion {
         self.keyringPathExistsChanged();
     }
 
-    // we get the urls separated by spaces here because I can't for the life of me figure
-    // out how to pass a string array from qml to c++/rust with QVariantList and all that
-    fn addFiles(&mut self, urls: QString) {
-        println!("Add file urls: {}", urls.to_string());
+    fn addFiles(&mut self, urls: QVariantList) {
+        let urls: Vec<String> = urls
+            .into_iter()
+            .map(|variant| {
+                if variant.type_name().to_string() != "QString" {
+                    panic!("Wrong QVariant type passed from QML");
+                }
+                variant.to_qstring().to_string()
+            })
+            .collect();
         self._files.retain(|f| match f.status {
             FileStatus::Done | FileStatus::Canceled | FileStatus::Error(_) => false,
             _ => true,
         });
-        let urls = urls.to_string();
-        let urls: Vec<&str> = urls.split(' ').filter(|s| !s.is_empty()).collect();
         for url in urls {
             let url = match Url::parse(url.to_string().as_str()) {
                 Err(e) => {

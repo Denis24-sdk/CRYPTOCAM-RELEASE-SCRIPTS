@@ -212,14 +212,7 @@ Item {
         selectMultiple: true
         nameFilters: [ "Cryptocam output files (*)" ]
         onAccepted: {
-            let urls = []
-            for (let i in fileUrls) {
-                urls += fileUrls[i].toString()
-                if (i < fileUrls.length - 1) {
-                    urls += ' '
-                }
-            }
-            cryptocam.addFiles(urls)
+            cryptocam.addFiles(fileUrls.map((u) => u.toString()))
         }
         modality: "ApplicationModal"
     }
