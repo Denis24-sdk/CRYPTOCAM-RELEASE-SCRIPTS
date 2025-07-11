@@ -13,7 +13,7 @@ AppDir:
     id: com.tnibler.cryptocam-companion
     name: Cryptocam Companion
     icon: cryptocam-companion
-    version: 0.2.3
+    version: 0.2.4
     exec: usr/bin/cryptocam-qt
     # Set the application main script path as argument. Use '$@' to forward CLI parameters
     exec_args: $@
@@ -21,7 +21,7 @@ AppDir:
   apt:
     arch: amd64
     sources:
-      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ hirsute main restricted universe multiverse'
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse'
         key_url: 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
 
     include:
