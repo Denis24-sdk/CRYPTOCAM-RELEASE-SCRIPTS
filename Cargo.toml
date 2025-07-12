@@ -12,7 +12,7 @@ qmetaobject = "0.2.10"
 # qmetaobject = { git = "https://github.com/tnibler/qmetaobject-rs", branch = "override-qt-paths" }
 cstr = "0.1.7"
 cpp = "0.5.6"
-libcryptocam = { git = "https://gitlab.com/cryptocam/libcryptocam", tag = "v0.1.4" }
+libcryptocam = { git = "https://gitlab.com/cryptocam/libcryptocam", tag = "v0.1.5" }
 anyhow = "1.0"
 
 url = "2.2.1"

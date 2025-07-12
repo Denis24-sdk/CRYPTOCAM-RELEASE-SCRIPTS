@@ -17,16 +17,16 @@ ENV PATH="${PATH}:/usr/lib/qt5/bin"
 RUN mkdir build
 WORKDIR build
 
-RUN wget https://github.com/GyanD/codexffmpeg/releases/download/6.1.1/ffmpeg-6.1.1-full_build-shared.7z
-RUN 7z x ffmpeg-6.1.1-full_build-shared.7z
-RUN mv ffmpeg-6.1.1-full_build-shared ffmpeg
-
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtquickcontrols2-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtsvg-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt5_5152/qt.qt5.5152.win64_mingw81/5.15.2-0-202011130602qtquickcontrols-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z > /dev/null
 RUN wget https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_mingw/qt.tools.win64_mingw810/8.1.0-1-202004170606x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z > /dev/null
+
+RUN wget https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build-shared.7z > /dev/null
+RUN 7z x ffmpeg-7.1.1-full_build-shared.7z
+RUN mv ffmpeg-7.1.1-full_build-shared ffmpeg
 
 RUN 7z x -oqt_libs 5.15.2-0-202011130602qtbase-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
 RUN 7z x -oqt_libs 5.15.2-0-202011130602qtdeclarative-Windows-Windows_10-Mingw-Windows-Windows_10-X86_64.7z 5.15.2/mingw81_64
@@ -39,9 +39,9 @@ RUN rm qt_libs/5.15.2/mingw81_64/bin/*.exe
 
 COPY qml ./qml
 COPY src ./src
-COPY Cargo.toml cryptocam-companion.svg build.rs ./
+COPY Cargo.lock Cargo.toml cryptocam-companion.svg build.rs ./
 
-RUN DEP_QT_INCLUDE_PATH="/build/qt_libs/5.15.2/mingw81_64/include" DEP_QT_LIBRARY_PATH="/build/qt_libs/5.15.2/mingw81_64/lib"  CXXFLAGS="-lstdc++,-lpthread -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/lib cargo build --target x86_64-pc-windows-gnu --release
+RUN QMAKE=/usr/lib/qt5/bin/qmake QT_INCLUDE_PATH="/build/qt_libs/5.15.2/mingw81_64/include" QT_LIBRARY_PATH="/build/qt_libs/5.15.2/mingw81_64/lib"  CXXFLAGS="-lstdc++,-lpthread -I/build/qt_libs/5.15.0/mingw81_64/include" CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ FFMPEG_INCLUDE_DIR=/build/ffmpeg/include FFMPEG_LIB_DIR=/build/ffmpeg/lib cargo build --target x86_64-pc-windows-gnu --release --locked
 
 RUN mkdir package
 RUN rm ffmpeg/bin/avdevice*.dll ffmpeg/bin/postproc*.dll ffmpeg/bin/*.exe
