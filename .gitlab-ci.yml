@@ -12,8 +12,8 @@ build_linux_amd64:
         - when: manual
     before_script:
         - apt-get update
-        - DEBIAN_FRONTEND=noninteractive apt-get -y install cargo rustc ffmpeg libavformat-dev libavcodec-dev libswscale-dev libavutil-dev qt5-qmake g++ qtbase5-dev qtdeclarative5-dev qtquickcontrols2-5-dev
-        - ls -l /usr/include/
+        - DEBIAN_FRONTEND=noninteractive apt-get -y install rustup ffmpeg libavformat-dev libavcodec-dev libswscale-dev libavutil-dev qt5-qmake g++ qtbase5-dev qtdeclarative5-dev qtquickcontrols2-5-dev
+        - rustup default stable && rustup update
 
     script:
         - cd $CI_PROJECT_DIR
