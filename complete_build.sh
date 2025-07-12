@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ###
 # This script compiles the needed go libraries into Android AAR files.
@@ -10,7 +10,8 @@
 # Afterwards, you can build the app with ./gradlew assembleDebug as usual
 ###
 
+set -e
 cd age-encryption
-gomobile bind -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
+gomobile bind -androidapi 21 -o ../app/libs/encrypted_writer.aar tnibler.com/cryptocam-age-encryption
 cd ..
-./gradlew assembleDebug
+./gradlew assembleRelease
