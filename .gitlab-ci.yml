@@ -13,7 +13,9 @@ build_linux_amd64:
     before_script:
         - apt-get update
         - DEBIAN_FRONTEND=noninteractive apt-get -y install rustup ffmpeg libavformat-dev libavcodec-dev libswscale-dev libavutil-dev qt5-qmake g++ qtbase5-dev qtdeclarative5-dev qtquickcontrols2-5-dev
-        - rustup default stable && rustup update
+        - rustup set auto-self-update disable
+        - rustup default stable
+        - rustup update
 
     script:
         - cd $CI_PROJECT_DIR
