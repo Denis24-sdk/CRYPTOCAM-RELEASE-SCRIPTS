@@ -1,0 +1,10 @@
+New Features:
+ - Viewer for last taken photo (never written to disk)
+ - Option to remember last shooting mode
+
+Other:
+ - Fix bugs and jank with photo shutter and flash
+ - Add secure flag so the app contents don't appear in screenshots
+ - Target Android API level 33
+
+Thanks to Egor Mozgovoy for most of these :)
