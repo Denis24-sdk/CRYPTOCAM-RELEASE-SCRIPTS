@@ -36,8 +36,8 @@
         </activity>
         <service
             android:name="com.tnibler.cryptocam.video.RecordingService"
-            android:foregroundServiceType="camera|microphone">
-
+            android:foregroundServiceType="camera|microphone"
+            android:exported="true">
         </service>
         
         <service android:name=".RecordTileService"

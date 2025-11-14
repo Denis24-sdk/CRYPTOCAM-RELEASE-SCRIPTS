@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.Duration
+import android.content.pm.PackageManager
 
 class RecordingService : Service(), LifecycleOwner {
     private val FEEDBACK_INTERVAL = 5_000 // vibrate every ~5 seconds while recording
@@ -128,49 +129,88 @@ class RecordingService : Service(), LifecycleOwner {
         (applicationContext as App).recordingService = null
     }
 
+    private var currentParams: RecordingParams? = null // Храним параметры текущей записи
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand()")
-        if (intent?.action == ACTION_TOGGLE_RECORDING) {
-            Log.d(TAG, "ACTION_TOGGLE_RECORDING")
-            startRecordingAction = true
-            stopServiceAfterRecording = true
-            Log.d(TAG, "stopServiceAfterRecording = true")
-            if (_state.value is State.ReadyToRecord || _state.value is State.NotReadyToRecord) {
-                if (!isBound) {
-                    Log.d(TAG, "Service not bound, foregrounding")
-                    foreground()
-                } else {
-                    // the service is started with startForeground() on Android >= O, so we need to call
-                    // startForeground() in here even if we don't want to be in foreground.
-                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
-                        foreground()
-                        background()
+        Log.d(TAG, "onStartCommand() with action: ${intent?.action}")
+
+        if (intent == null) {
+            return START_NOT_STICKY
+        }
+
+        when (intent.action) {
+            ApiConstants.ACTION_START -> handleStartCommand(intent)
+            ApiConstants.ACTION_STOP -> handleStopCommand()
+            // ИСПРАВЛЯЕМ ЭТОТ БЛОК
+            ACTION_TOGGLE_RECORDING -> {
+                Log.d(TAG, "ACTION_TOGGLE_RECORDING received")
+                if (state.value is State.Recording) {
+                    // Раньше тут был toggleRecording()
+                    stopRecording()
+                } else if (state.value is State.ReadyToRecord) {
+                    // Раньше тут был toggleRecording()
+                    // Для старой кнопки нужен какой-то режим по умолчанию
+                    val defaultIntent = Intent().apply {
+                        putExtra(ApiConstants.EXTRA_MODE, ApiConstants.MODE_DAY)
+                        putExtra(ApiConstants.EXTRA_RESOLUTION, "FHD")
                     }
-                }
-            }
-            when (_state.value) {
-                is State.Recording -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        TileService.requestListeningState(
-                            this,
-                            ComponentName(this, RecordTileService::class.java)
-                        )
-                    }
-                    toggleRecording()
-                }
-                is State.NotReadyToRecord -> {
-                    Log.d(TAG, "Initializing from onStartCommand")
-                    val app = (applicationContext as App)
-                    val keyManager: KeyManager = app.globalServices.get()
-                    init(keyManager.selectedRecipients.value)
-                }
-                is State.ReadyToRecord -> {
-                    toggleRecording()
+                    handleStartCommand(defaultIntent)
                 }
             }
         }
+
         return START_REDELIVER_INTENT
     }
+
+    private fun handleStartCommand(intent: Intent) {
+        // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись уже идет, игнорируем новую команду старта.
+        if (state.value is State.Recording) {
+            Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
+            return
+        }
+
+        // Парсим параметры из команды
+        val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
+        val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
+        val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
+
+        val resolution = when (resStr.uppercase()) {
+            "HD" -> Size(1280, 720)
+            "FHD" -> Size(1920, 1080)
+            "2K" -> Size(2560, 1440)
+            "4K" -> Size(3840, 2160)
+            else -> Size(1920, 1080) // По умолчанию FHD
+        }
+
+        currentParams = RecordingParams(mode, resolution, codec)
+        Log.d(TAG, "Parsed recording params: $currentParams")
+
+        // Проверяем, готовы ли мы к записи
+        if (state.value is State.NotReadyToRecord) {
+            Log.d(TAG, "Initializing from START command")
+            val app = (applicationContext as App)
+            val keyManager: KeyManager = app.globalServices.get()
+            // Передаем получателей для шифрования
+            init(keyManager.selectedRecipients.value)
+            // После инициализации, запись начнется автоматически
+            startRecordingAction = true // Этот флаг подхватится в `initRecording`
+        } else if (state.value is State.ReadyToRecord) {
+            // Если сервис уже готов, просто начинаем запись
+            startRecording()
+        }
+    }
+
+    private fun handleStopCommand() {
+        // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись не идет, игнорируем команду стоп.
+        if (state.value !is State.Recording) {
+            Log.w(TAG, "Stop command received, but not recording. Ignoring.")
+            return
+        }
+
+        Log.d(TAG, "Stopping recording via command.")
+        stopRecording()
+    }
+
 
     fun init(recipients: Collection<KeyManager.X25519Recipient>) {
         this.recipients = recipients
@@ -179,53 +219,42 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
-    fun toggleRecording() {
-        Log.d(TAG, "toggleRecording()")
-        val recordingManager = recordingManager
-        if (recordingManager == null) {
-            Toast.makeText(this, "RecordingService: recordingManager is null", Toast.LENGTH_LONG)
-                .show()
-            return
-        }
-        _state.value = when (val currentState = _state.value) {
-            is State.NotReadyToRecord -> currentState
-            is State.Recording -> {
-                when (recordingManager.recordButtonClicked()) {
-                    RecordingManager.State.NOT_RECORDING -> {
-                        updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
-                        stopForeground(true)
-                        isInForeground = false
-                        State.ReadyToRecord(
-                            currentState.resolution,
-                            currentState.surfaceRotation,
-                            currentState.selectedCamera,
-                            currentState.flashOn
-                        )
-                    }
-                    RecordingManager.State.RECORDING -> currentState
-                }
-            }
-            is State.ReadyToRecord -> {
-                when (recordingManager.recordButtonClicked()) {
-                    RecordingManager.State.RECORDING -> {
-                        updateRecordingStateHandler.post(updateRecordingStateRunnable)
-                        lastVibrateFeedback = System.currentTimeMillis()
-                        State.Recording(
-                            currentState.resolution,
-                            currentState.surfaceRotation,
-                            Duration.ZERO,
-                            currentState.selectedCamera,
-                            currentState.flashOn
-                        )
-                    }
-                    RecordingManager.State.NOT_RECORDING -> currentState
-                }
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            TileService.requestListeningState(this, ComponentName(this, RecordTileService::class.java))
+    fun startRecording() {
+        // Логика старта записи
+        val recordingManager = recordingManager ?: return
+        if (state.value is State.ReadyToRecord) {
+            recordingManager.recordButtonClicked()
+            updateRecordingStateHandler.post(updateRecordingStateRunnable)
+            lastVibrateFeedback = System.currentTimeMillis()
+            _state.value = State.Recording(
+                (state.value as State.ReadyToRecord).resolution,
+                (state.value as State.ReadyToRecord).surfaceRotation,
+                Duration.ZERO,
+                (state.value as State.ReadyToRecord).selectedCamera,
+                (state.value as State.ReadyToRecord).flashOn
+            )
         }
     }
+
+    fun stopRecording() {
+        // Логика остановки записи
+        val recordingManager = recordingManager ?: return
+        if (state.value is State.Recording) {
+            recordingManager.recordButtonClicked()
+            updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
+            if (!isBound) { // Если нет привязки от UI, можно гасить foreground
+                stopForeground(true)
+                isInForeground = false
+            }
+            _state.value = State.ReadyToRecord(
+                (state.value as State.Recording).resolution,
+                (state.value as State.Recording).surfaceRotation,
+                (state.value as State.Recording).selectedCamera,
+                (state.value as State.Recording).flashOn
+            )
+        }
+    }
+
 
     fun toggleFlash() {
         val currentState = _state.value
@@ -278,6 +307,14 @@ class RecordingService : Service(), LifecycleOwner {
 
     fun foreground() {
         Log.d(TAG, "foreground()")
+
+        // ДОБАВЛЯЕМ ПРОВЕРКУ
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Attempted to start foreground service without FOREGROUND_SERVICE permission.")
+            // Мы не можем запустить сервис, если нет разрешения. Просто выходим.
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             startForeground(
                 notificationId,
@@ -431,7 +468,7 @@ class RecordingService : Service(), LifecycleOwner {
                         startRecordingAction = false
                         delay(400)
                         (application as App).startedRecordingOnLaunch = true
-                        toggleRecording()
+                        startRecording()
                     }
                 }
                 else -> {
@@ -523,10 +560,16 @@ class RecordingService : Service(), LifecycleOwner {
                 } else {
                     String.format("%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
                 }
-                val n =
-                    notificationBuilder.setContentText(getString(R.string.notification_text, text))
-                        .build()
-                notificationManager.notify(notificationId, n)
+                val n = notificationBuilder.setContentText(getString(R.string.notification_text, text))
+                    .build()
+
+                // ДОБАВЛЯЕМ ПРОВЕРКУ
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(this@RecordingService, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    // На Android 13+ нет разрешения на показ уведомлений, ничего не делаем
+                } else {
+                    notificationManager.notify(notificationId, n)
+                }
             }
             updateRecordingStateHandler.postDelayed(this, 200)
         }

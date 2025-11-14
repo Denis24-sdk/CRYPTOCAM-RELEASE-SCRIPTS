@@ -148,7 +148,28 @@ class VideoFragment : Fragment() {
             btnToggleCamera.setOnClickListener {
                 service?.toggleCamera()
             }
-            btnRecordVideo.setOnClickListener { service?.toggleRecording() }
+            btnRecordVideo.setOnClickListener {
+                // Получаем текущий сервис, если его нет - ничего не делаем
+                val currentService = service ?: return@setOnClickListener
+
+                // Проверяем ТЕКУЩЕЕ СОСТОЯНИЕ сервиса
+                when (currentService.state.value) {
+                    // Если сервис СЕЙЧАС ЗАПИСЫВАЕТ - вызываем ОСТАНОВКУ
+                    is RecordingService.State.Recording -> {
+                        currentService.stopRecording()
+                    }
+                    // Если сервис СЕЙЧАС ГОТОВ К ЗАПИСИ - вызываем СТАРТ
+                    is RecordingService.State.ReadyToRecord -> {
+                        currentService.startRecording()
+                    }
+                    // В любом другом состоянии (например, NotReadyToRecord) - ничего не делаем
+                    else -> {
+                        // Можно добавить лог для отладки, если нужно
+                        Log.d(TAG, "Record button pressed, but service is not in a state to react.")
+                    }
+                }
+            }
+
             btnSettings.setOnClickListener {
                 backstack.goTo(SettingsKey())
             }
