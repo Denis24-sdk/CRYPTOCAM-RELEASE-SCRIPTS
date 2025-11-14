@@ -80,6 +80,30 @@ class RecordingService : Service(), LifecycleOwner {
     private var startRecordingAction = false
     private var stopServiceAfterRecording = false
 
+    private val vibrator by lazy { ContextCompat.getSystemService(this, Vibrator::class.java)!! }
+
+    private fun vibrateOnStart() {
+        // TODO: Добавить проверку настройки из SharedPreferences
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(50)
+        }
+    }
+
+    private fun vibrateOnStop() {
+        // TODO: Добавить проверку настройки из SharedPreferences
+        val pattern = longArrayOf(0, 50, 100, 50) // Ждем 0мс, вибрируем 50мс, ждем 100мс, вибрируем 50мс
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
+    }
+
+
     private fun buildOrientationEventListener(): OrientationEventListener {
         return object : OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
@@ -132,6 +156,7 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private var currentParams: RecordingParams? = null // Храним параметры текущей записи
+    @Volatile private var isStopping = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand() with action: ${intent?.action}")
@@ -140,37 +165,26 @@ class RecordingService : Service(), LifecycleOwner {
             return START_NOT_STICKY
         }
 
-        // --- НАЧАЛО ИСПРАВЛЕНИЙ ---
-        // Для ЛЮБОЙ команды, пришедшей извне, мы НЕМЕДЛЕННО показываем уведомление,
-        // чтобы выполнить требование Android и избежать крэша.
         when (intent.action) {
-            ApiConstants.ACTION_START, ApiConstants.ACTION_STOP -> {
-                Log.d(TAG, "Foregrounding service to handle API command.")
-                foreground() // Выполняем обещание СРАЗУ ЖЕ!
+            ApiConstants.ACTION_START -> {
+                Log.d(TAG, "Foregrounding service to handle API start command.")
+                foreground()
+                handleStartCommand(intent)
             }
-        }
-        // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
-
-        when (intent.action) {
-            ApiConstants.ACTION_START -> handleStartCommand(intent)
             ApiConstants.ACTION_STOP -> {
+                // Уведомление уже должно быть, так как сервис работает. Просто вызываем остановку.
                 handleStopCommand()
-                // Если команда была "стоп", и мы не были привязаны к UI,
-                // то сервис больше не нужен, останавливаем его.
-                if (!isBound) {
-                    Log.d(TAG, "Stopping self after stop command.")
-                    stopSelf()
-                }
             }
             ACTION_TOGGLE_RECORDING -> {
                 Log.d(TAG, "ACTION_TOGGLE_RECORDING received")
                 if (state.value is State.Recording) {
-                    stopRecording()
+                    handleStopCommand() // Используем общую логику остановки
                 } else if (state.value is State.ReadyToRecord) {
                     val defaultIntent = Intent().apply {
                         putExtra(ApiConstants.EXTRA_MODE, ApiConstants.MODE_DAY)
                         putExtra(ApiConstants.EXTRA_RESOLUTION, "FHD")
                     }
+                    foreground() // Перед стартом нужно показать уведомление
                     handleStartCommand(defaultIntent)
                 }
             }
@@ -179,39 +193,35 @@ class RecordingService : Service(), LifecycleOwner {
         return START_REDELIVER_INTENT
     }
 
-
     private fun handleStartCommand(intent: Intent) {
-        Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
-        if (state.value is State.Recording) {
-            Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
+        if (state.value is State.Recording || isStopping) {
+            Log.w(TAG, "Start command received, but recording is already in progress or stopping. Ignoring.")
             return
         }
 
-        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
 
-        // 1. Парсим все параметры из команды
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
 
-        // 2. Определяем детальные настройки на основе режима (mode)
         val useUltraWide: Boolean
         val fps: Int
         val oisEnabled: Boolean
         val eisEnabled: Boolean
-        var lensFacing: Int // Направление камеры (задняя/передняя)
+        var lensFacing: Int
 
         when (mode) {
             ApiConstants.MODE_DAY -> {
                 lensFacing = CameraSelector.LENS_FACING_BACK
-                useUltraWide = true // Пытаемся использовать ширик
+                useUltraWide = true
                 fps = 60
                 oisEnabled = false
                 eisEnabled = false
             }
             ApiConstants.MODE_NIGHT -> {
                 lensFacing = CameraSelector.LENS_FACING_BACK
-                useUltraWide = false // Обычный модуль
+                useUltraWide = false
                 fps = 30
                 oisEnabled = true
                 eisEnabled = false
@@ -221,9 +231,9 @@ class RecordingService : Service(), LifecycleOwner {
                 useUltraWide = false
                 fps = 30
                 oisEnabled = false
-                eisEnabled = false // На фронтальной не принципиально
+                eisEnabled = false
             }
-            else -> { // Режим по умолчанию, если пришла неизвестная команда
+            else -> {
                 lensFacing = CameraSelector.LENS_FACING_BACK
                 useUltraWide = false
                 fps = 30
@@ -232,11 +242,8 @@ class RecordingService : Service(), LifecycleOwner {
             }
         }
 
-        // Устанавливаем наш глобальный `cameraSelector`
-        // Позже мы его уточним, чтобы найти именно широкоугольную камеру
         cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
 
-        // 3. Конвертируем разрешение из строки в Size
         val resolution = when (resStr.uppercase()) {
             "HD" -> Size(1280, 720)
             "FHD" -> Size(1920, 1080)
@@ -245,7 +252,6 @@ class RecordingService : Service(), LifecycleOwner {
             else -> Size(1920, 1080)
         }
 
-        // 4. Сохраняем все в наш объект currentParams
         currentParams = RecordingParams(
             mode = mode,
             resolution = resolution,
@@ -265,12 +271,10 @@ class RecordingService : Service(), LifecycleOwner {
             init(keyManager.selectedRecipients.value)
             startRecordingAction = true
 
-            // ЯВНО ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ КАМЕРЫ ЗДЕСЬ!
             if (cameraProvider == null) {
                 Log.d(TAG, "CameraProvider is null. Calling initCamera().")
                 initCamera()
             } else {
-                // Если провайдер уже есть, значит, можно сразу настраивать use cases
                 Log.d(TAG, "CameraProvider already exists. Calling initUseCases().")
                 initUseCases()
             }
@@ -284,7 +288,6 @@ class RecordingService : Service(), LifecycleOwner {
         val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
 
-        // Ищем кодер для HEVC
         val encoderName = mediaCodecList.findEncoderForFormat(format)
         if (encoderName == null) {
             Log.w(TAG, "HEVC codec is NOT supported on this device.")
@@ -293,13 +296,11 @@ class RecordingService : Service(), LifecycleOwner {
 
         Log.d(TAG, "HEVC codec found: $encoderName. Checking capabilities...")
 
-        // Теперь, когда мы нашли кодер, получаем его "паспорт" (возможности)
         try {
             val codecInfo = mediaCodecList.codecInfos.first { it.name == encoderName }
             val capabilities = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
             val videoCapabilities = capabilities.videoCapabilities
 
-            // Проверяем, поддерживает ли кодер нашу частоту кадров для нашего разрешения
             if (videoCapabilities.isSizeSupported(width, height) &&
                 videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())) {
 
@@ -311,21 +312,30 @@ class RecordingService : Service(), LifecycleOwner {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to check HEVC capabilities", e)
-            return false // Если что-то пошло не так при проверке, считаем, что не поддерживается
+            return false
         }
     }
 
 
     private fun handleStopCommand() {
-        // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись не идет, игнорируем команду стоп.
         if (state.value !is State.Recording) {
             Log.w(TAG, "Stop command received, but not recording. Ignoring.")
             return
         }
+        // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
+        if (isStopping) {
+            Log.w(TAG, "Stop command received, but service is already in stopping process. Ignoring.")
+            return
+        }
+        isStopping = true
+        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         Log.d(TAG, "Stopping recording via command.")
+        // Устанавливаем флаг, чтобы callback знал, что нужно остановить сервис
+        stopServiceAfterRecording = true
         stopRecording()
     }
+
 
 
     fun init(recipients: Collection<KeyManager.X25519Recipient>) {
@@ -334,9 +344,9 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     fun startRecording() {
-        // Логика старта записи
         val recordingManager = recordingManager ?: return
         if (state.value is State.ReadyToRecord) {
+            vibrateOnStart()
             recordingManager.recordButtonClicked()
             updateRecordingStateHandler.post(updateRecordingStateRunnable)
             lastVibrateFeedback = System.currentTimeMillis()
@@ -353,15 +363,16 @@ class RecordingService : Service(), LifecycleOwner {
 
 
     fun stopRecording() {
-        // Логика остановки записи
         val recordingManager = recordingManager ?: return
         if (state.value is State.Recording) {
+            vibrateOnStop()
             recordingManager.recordButtonClicked()
             updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
-            if (!isBound) { // Если нет привязки от UI, можно гасить foreground
-                stopForeground(true)
-                isInForeground = false
-            }
+
+            // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
+            // УБИРАЕМ stopForeground() ОТСЮДА. Он будет вызван в callback'е.
+            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
             _state.value = State.ReadyToRecord(
                 (state.value as State.Recording).resolution,
                 (state.value as State.Recording).surfaceRotation,
@@ -370,6 +381,7 @@ class RecordingService : Service(), LifecycleOwner {
             )
         }
     }
+
 
 
     fun toggleFlash() {
@@ -424,10 +436,8 @@ class RecordingService : Service(), LifecycleOwner {
     fun foreground() {
         Log.d(TAG, "foreground()")
 
-        // ДОБАВЛЯЕМ ПРОВЕРКУ
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "Attempted to start foreground service without FOREGROUND_SERVICE permission.")
-            // Мы не можем запустить сервис, если нет разрешения. Просто выходим.
             return
         }
 
@@ -480,7 +490,6 @@ class RecordingService : Service(), LifecycleOwner {
         var finalCodec = MediaFormat.MIMETYPE_VIDEO_AVC
         if (params.codec == ApiConstants.CODEC_HEVC) {
             Log.d(TAG, "HEVC codec requested. Attempting to use it.")
-            // Мы просто доверяем, что VideoStreamCapture справится с ошибкой
             finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
         }
 
@@ -577,11 +586,19 @@ class RecordingService : Service(), LifecycleOwner {
             lifecycleScope,
             outputFileManager!!,
             recordingStoppedCallback = {
+                // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
+                Log.d(TAG, "RecordingManager: recordingStoppedCallback triggered.")
+                isStopping = false // Сбрасываем флаг
                 if (stopServiceAfterRecording) {
-                    Log.d(TAG, "recordingStoppedCallback: stopSelf()")
+                    Log.d(TAG, "Callback: Stopping foreground and self.")
+                    // Теперь это безопасное место для остановки сервиса
+                    stopForeground(true)
+                    isInForeground = false
                     stopSelf()
                 }
+                // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             },
+
             videoPacketCallback = {
                 val now = System.currentTimeMillis()
                 if (shouldVibrate && now - lastVibrateFeedback >= FEEDBACK_INTERVAL) {
@@ -607,7 +624,7 @@ class RecordingService : Service(), LifecycleOwner {
                     if (startRecordingAction) {
                         startRecordingAction = false
                         Log.d(TAG, "===> STEP 11: startRecordingAction is true. Starting recording now...")
-                        delay(400) // Эта задержка может быть важна
+                        delay(400)
                         startRecording()
                     }
                 }
@@ -668,7 +685,6 @@ class RecordingService : Service(), LifecycleOwner {
         cameraProvider.unbind(useCase)
     }
 
-    private val vibrator by lazy { ContextCompat.getSystemService(this, Vibrator::class.java)!! }
     private fun vibrate() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(50, VIBRATE_INTENSITY))
@@ -703,10 +719,8 @@ class RecordingService : Service(), LifecycleOwner {
                 val n = notificationBuilder.setContentText(getString(R.string.notification_text, text))
                     .build()
 
-                // ДОБАВЛЯЕМ ПРОВЕРКУ
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     ContextCompat.checkSelfPermission(this@RecordingService, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    // На Android 13+ нет разрешения на показ уведомлений, ничего не делаем
                 } else {
                     notificationManager.notify(notificationId, n)
                 }
