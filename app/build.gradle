@@ -6,7 +6,7 @@ apply plugin: 'kotlin-parcelize'
 
 android {
     namespace "com.tnibler.cryptocam"
-    compileSdk 36
+    compileSdk 35
     defaultConfig {
         applicationId "com.tnibler.cryptocam"
         minSdkVersion 21
