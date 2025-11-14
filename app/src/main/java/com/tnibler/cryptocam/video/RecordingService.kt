@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.Duration
 import android.content.pm.PackageManager
+import android.media.MediaCodecList
+import android.media.MediaFormat
 
 class RecordingService : Service(), LifecycleOwner {
     private val FEEDBACK_INTERVAL = 5_000 // vibrate every ~5 seconds while recording
@@ -277,6 +279,42 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
+    @SuppressLint("NewApi")
+    private fun isHevcSupported(width: Int, height: Int, frameRate: Int): Boolean {
+        val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
+
+        // Ищем кодер для HEVC
+        val encoderName = mediaCodecList.findEncoderForFormat(format)
+        if (encoderName == null) {
+            Log.w(TAG, "HEVC codec is NOT supported on this device.")
+            return false
+        }
+
+        Log.d(TAG, "HEVC codec found: $encoderName. Checking capabilities...")
+
+        // Теперь, когда мы нашли кодер, получаем его "паспорт" (возможности)
+        try {
+            val codecInfo = mediaCodecList.codecInfos.first { it.name == encoderName }
+            val capabilities = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
+            val videoCapabilities = capabilities.videoCapabilities
+
+            // Проверяем, поддерживает ли кодер нашу частоту кадров для нашего разрешения
+            if (videoCapabilities.isSizeSupported(width, height) &&
+                videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())) {
+
+                Log.d(TAG, "SUCCESS: HEVC is supported for ${width}x${height} @ ${frameRate}fps.")
+                return true
+            } else {
+                Log.w(TAG, "FAILURE: HEVC codec exists, but does NOT support ${width}x${height} @ ${frameRate}fps.")
+                return false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check HEVC capabilities", e)
+            return false // Если что-то пошло не так при проверке, считаем, что не поддерживается
+        }
+    }
+
 
     private fun handleStopCommand() {
         // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись не идет, игнорируем команду стоп.
@@ -430,11 +468,7 @@ class RecordingService : Service(), LifecycleOwner {
     @SuppressLint("RestrictedApi")
     fun initUseCases() {
         Log.d(TAG, "===> STEP 6: initUseCases CALLED")
-        val cameraProvider = cameraProvider
-        if (cameraProvider == null) {
-            Log.e(TAG, "===> FATAL: initUseCases called but cameraProvider is NULL.")
-            return
-        }
+        val cameraProvider = cameraProvider ?: return
         cameraProvider.unbindAll()
 
         val params = currentParams
@@ -442,6 +476,15 @@ class RecordingService : Service(), LifecycleOwner {
             Log.e(TAG, "===> FATAL: initUseCases called but no RecordingParams were set. Aborting.")
             return
         }
+
+        var finalCodec = MediaFormat.MIMETYPE_VIDEO_AVC
+        if (params.codec == ApiConstants.CODEC_HEVC) {
+            Log.d(TAG, "HEVC codec requested. Attempting to use it.")
+            // Мы просто доверяем, что VideoStreamCapture справится с ошибкой
+            finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
+        }
+
+
 
         Log.d(TAG, "Building videoCapture with params: $params")
 
@@ -452,6 +495,7 @@ class RecordingService : Service(), LifecycleOwner {
             .setBitRate(cameraSettings.bitrate)
             .setTargetRotation(Surface.ROTATION_90)
             .setIFrameInterval(1)
+            .setVideoCodec(finalCodec)
 
         videoCapture = videoCaptureBuilder.build()
 

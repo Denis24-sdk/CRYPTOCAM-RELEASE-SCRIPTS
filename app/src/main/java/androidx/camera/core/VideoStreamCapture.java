@@ -80,6 +80,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import android.annotation.SuppressLint;
+
 import static androidx.camera.core.impl.ImageOutputConfig.OPTION_DEFAULT_RESOLUTION;
 import static androidx.camera.core.impl.ImageOutputConfig.OPTION_MAX_RESOLUTION;
 import static androidx.camera.core.impl.ImageOutputConfig.OPTION_SUPPORTED_RESOLUTIONS;
@@ -213,35 +215,28 @@ public class VideoStreamCapture extends UseCase {
     private int mAudioBitRate;
     private DeferrableSurface mDeferrableSurface;
 
+    private final String mVideoCodec;
+
     /**
      * Creates a new video capture use case from the given configuration.
      *
      * @param config for this use case instance
      */
-    public VideoStreamCapture(VideoStreamCaptureConfig config) {
-        super(config);
 
-        // video thread start
+    public VideoStreamCapture(VideoStreamCaptureConfig config, String videoCodec) {
+        super(config);
+        this.mVideoCodec = videoCodec;
+
+        // Скопируйте содержимое старого конструктора сюда
         mVideoHandlerThread.start();
         mVideoHandler = new Handler(mVideoHandlerThread.getLooper());
 
-        // audio thread start
         mAudioHandlerThread.start();
         mAudioHandler = new Handler(mAudioHandlerThread.getLooper());
     }
 
-    /** Creates a {@link MediaFormat} using parameters from the configuration */
-    private static MediaFormat createMediaFormat(VideoStreamCaptureConfig config, Size resolution) {
-        MediaFormat format =
-                MediaFormat.createVideoFormat(
-                        VIDEO_MIME_TYPE, resolution.getWidth(), resolution.getHeight());
-        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatSurface);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, config.getBitRate());
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, config.getVideoFrameRate());
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
 
-        return format;
-    }
+
 
     @Override
     @Nullable
@@ -468,14 +463,50 @@ public class VideoStreamCapture extends UseCase {
     @SuppressWarnings("WeakerAccess") /* synthetic accessor */
     void setupEncoder(@NonNull String cameraId, @NonNull Size resolution) {
         VideoStreamCaptureConfig config = (VideoStreamCaptureConfig) getCurrentConfig();
-
-        // video encoder setup
         mVideoEncoder.reset();
-        mVideoEncoder.configure(
-                createMediaFormat(config, resolution), /*surface*/
-                null, /*crypto*/
-                null,
-                MediaCodec.CONFIGURE_FLAG_ENCODE);
+
+        // --- НАЧАЛО ИЗМЕНЕНИЙ (ПЛАН "Б") ---
+        try {
+            Log.d(TAG, "[Attempt 1] Configuring video encoder with codec: " + mVideoCodec);
+            MediaFormat videoFormat = MediaFormat.createVideoFormat(
+                    mVideoCodec, resolution.getWidth(), resolution.getHeight());
+            videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                    CodecCapabilities.COLOR_FormatSurface);
+            videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, config.getBitRate());
+            videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, config.getVideoFrameRate());
+            videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
+
+            mVideoEncoder.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            Log.d(TAG, "SUCCESS: Codec " + mVideoCodec + " configured successfully.");
+
+        } catch (Exception e) {
+            Log.e(TAG, "FAILED to configure codec " + mVideoCodec + ". Error: " + e.getMessage());
+
+            // ЕСЛИ ПЕРВАЯ ПОПЫТКА НЕ УДАЛАСЬ, ПЫТАЕМСЯ СНОВА С AVC
+            if (!mVideoCodec.equals(MediaFormat.MIMETYPE_VIDEO_AVC)) {
+                Log.w(TAG, "[Attempt 2] Falling back to AVC codec.");
+                mVideoEncoder.reset();
+
+                MediaFormat videoFormat = MediaFormat.createVideoFormat(
+                        MediaFormat.MIMETYPE_VIDEO_AVC, resolution.getWidth(), resolution.getHeight());
+                videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                        CodecCapabilities.COLOR_FormatSurface);
+                videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, config.getBitRate());
+                videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, config.getVideoFrameRate());
+                videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
+
+                // Эта вторая попытка ДОЛЖНА сработать. Если нет - то проблема глубже.
+                mVideoEncoder.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+                Log.d(TAG, "SUCCESS: Fallback to AVC configured successfully.");
+            } else {
+                // Если даже AVC не сработал, то выбрасываем ошибку дальше.
+                throw e;
+            }
+        }
+        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+
+
         if (mCameraSurface != null) {
             releaseCameraSurface(false);
         }
@@ -1001,6 +1032,7 @@ public class VideoStreamCapture extends UseCase {
             ThreadConfig.Builder<VideoStreamCapture.Builder> {
 
         private final MutableOptionsBundle mMutableConfig;
+        private String mVideoCodec = MediaFormat.MIMETYPE_VIDEO_AVC;
 
         /** Creates a new Builder object. */
         public Builder() {
@@ -1088,7 +1120,7 @@ public class VideoStreamCapture extends UseCase {
                         "Cannot use both setTargetResolution and setTargetAspectRatio on the same "
                                 + "config.");
             }
-            return new VideoStreamCapture(getUseCaseConfig());
+            return new VideoStreamCapture(getUseCaseConfig(), mVideoCodec);
         }
 
         /**
@@ -1200,6 +1232,13 @@ public class VideoStreamCapture extends UseCase {
         @NonNull
         public VideoStreamCapture.Builder setAudioMinBufferSize(int minBufferSize) {
             getMutableConfig().insertOption(OPTION_AUDIO_MIN_BUFFER_SIZE, minBufferSize);
+            return this;
+        }
+
+
+        @NonNull
+        public Builder setVideoCodec(@NonNull String codecMimeType) {
+            this.mVideoCodec = codecMimeType;
             return this;
         }
 
