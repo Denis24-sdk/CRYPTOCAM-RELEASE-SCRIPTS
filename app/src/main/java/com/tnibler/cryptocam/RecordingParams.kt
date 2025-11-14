@@ -2,11 +2,13 @@ package com.tnibler.cryptocam.video
 
 import android.util.Size
 
-// Этот data-класс будет содержать все настройки для текущей сессии записи.
-// Мы будем создавать его на основе параметров из CLI-команды.
+// Добавляем новые поля
 data class RecordingParams(
     val mode: String,
     val resolution: Size,
     val codec: String,
-    // Позже мы добавим сюда FPS, стабилизацию и другие настройки из ТЗ.
+    val fps: Int,
+    val useUltraWide: Boolean,
+    val isOisEnabled: Boolean,
+    val isEisEnabled: Boolean
 )

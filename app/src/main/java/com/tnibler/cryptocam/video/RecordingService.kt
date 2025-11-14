@@ -134,22 +134,37 @@ class RecordingService : Service(), LifecycleOwner {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand() with action: ${intent?.action}")
 
-        if (intent == null) {
+        if (intent?.action == null) {
             return START_NOT_STICKY
         }
 
+        // --- НАЧАЛО ИСПРАВЛЕНИЙ ---
+        // Для ЛЮБОЙ команды, пришедшей извне, мы НЕМЕДЛЕННО показываем уведомление,
+        // чтобы выполнить требование Android и избежать крэша.
+        when (intent.action) {
+            ApiConstants.ACTION_START, ApiConstants.ACTION_STOP -> {
+                Log.d(TAG, "Foregrounding service to handle API command.")
+                foreground() // Выполняем обещание СРАЗУ ЖЕ!
+            }
+        }
+        // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
+
         when (intent.action) {
             ApiConstants.ACTION_START -> handleStartCommand(intent)
-            ApiConstants.ACTION_STOP -> handleStopCommand()
-            // ИСПРАВЛЯЕМ ЭТОТ БЛОК
+            ApiConstants.ACTION_STOP -> {
+                handleStopCommand()
+                // Если команда была "стоп", и мы не были привязаны к UI,
+                // то сервис больше не нужен, останавливаем его.
+                if (!isBound) {
+                    Log.d(TAG, "Stopping self after stop command.")
+                    stopSelf()
+                }
+            }
             ACTION_TOGGLE_RECORDING -> {
                 Log.d(TAG, "ACTION_TOGGLE_RECORDING received")
                 if (state.value is State.Recording) {
-                    // Раньше тут был toggleRecording()
                     stopRecording()
                 } else if (state.value is State.ReadyToRecord) {
-                    // Раньше тут был toggleRecording()
-                    // Для старой кнопки нужен какой-то режим по умолчанию
                     val defaultIntent = Intent().apply {
                         putExtra(ApiConstants.EXTRA_MODE, ApiConstants.MODE_DAY)
                         putExtra(ApiConstants.EXTRA_RESOLUTION, "FHD")
@@ -162,43 +177,106 @@ class RecordingService : Service(), LifecycleOwner {
         return START_REDELIVER_INTENT
     }
 
+
     private fun handleStartCommand(intent: Intent) {
-        // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись уже идет, игнорируем новую команду старта.
+        Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
         if (state.value is State.Recording) {
             Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
             return
         }
 
-        // Парсим параметры из команды
+        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+
+        // 1. Парсим все параметры из команды
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
 
+        // 2. Определяем детальные настройки на основе режима (mode)
+        val useUltraWide: Boolean
+        val fps: Int
+        val oisEnabled: Boolean
+        val eisEnabled: Boolean
+        var lensFacing: Int // Направление камеры (задняя/передняя)
+
+        when (mode) {
+            ApiConstants.MODE_DAY -> {
+                lensFacing = CameraSelector.LENS_FACING_BACK
+                useUltraWide = true // Пытаемся использовать ширик
+                fps = 60
+                oisEnabled = false
+                eisEnabled = false
+            }
+            ApiConstants.MODE_NIGHT -> {
+                lensFacing = CameraSelector.LENS_FACING_BACK
+                useUltraWide = false // Обычный модуль
+                fps = 30
+                oisEnabled = true
+                eisEnabled = false
+            }
+            ApiConstants.MODE_FRONT -> {
+                lensFacing = CameraSelector.LENS_FACING_FRONT
+                useUltraWide = false
+                fps = 30
+                oisEnabled = false
+                eisEnabled = false // На фронтальной не принципиально
+            }
+            else -> { // Режим по умолчанию, если пришла неизвестная команда
+                lensFacing = CameraSelector.LENS_FACING_BACK
+                useUltraWide = false
+                fps = 30
+                oisEnabled = true
+                eisEnabled = true
+            }
+        }
+
+        // Устанавливаем наш глобальный `cameraSelector`
+        // Позже мы его уточним, чтобы найти именно широкоугольную камеру
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+
+        // 3. Конвертируем разрешение из строки в Size
         val resolution = when (resStr.uppercase()) {
             "HD" -> Size(1280, 720)
             "FHD" -> Size(1920, 1080)
             "2K" -> Size(2560, 1440)
             "4K" -> Size(3840, 2160)
-            else -> Size(1920, 1080) // По умолчанию FHD
+            else -> Size(1920, 1080)
         }
 
-        currentParams = RecordingParams(mode, resolution, codec)
-        Log.d(TAG, "Parsed recording params: $currentParams")
+        // 4. Сохраняем все в наш объект currentParams
+        currentParams = RecordingParams(
+            mode = mode,
+            resolution = resolution,
+            codec = codec,
+            fps = fps,
+            useUltraWide = useUltraWide,
+            isOisEnabled = oisEnabled,
+            isEisEnabled = eisEnabled
+        )
 
-        // Проверяем, готовы ли мы к записи
-        if (state.value is State.NotReadyToRecord) {
-            Log.d(TAG, "Initializing from START command")
+        Log.d(TAG, "===> STEP 2: Parameters parsed successfully: $currentParams")
+
+        if (state.value is State.NotReadyToRecord || state.value is State.ReadyToRecord) {
+            Log.d(TAG, "===> STEP 3: Starting camera initialization process...")
             val app = (applicationContext as App)
             val keyManager: KeyManager = app.globalServices.get()
-            // Передаем получателей для шифрования
             init(keyManager.selectedRecipients.value)
-            // После инициализации, запись начнется автоматически
-            startRecordingAction = true // Этот флаг подхватится в `initRecording`
-        } else if (state.value is State.ReadyToRecord) {
-            // Если сервис уже готов, просто начинаем запись
-            startRecording()
+            startRecordingAction = true
+
+            // ЯВНО ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ КАМЕРЫ ЗДЕСЬ!
+            if (cameraProvider == null) {
+                Log.d(TAG, "CameraProvider is null. Calling initCamera().")
+                initCamera()
+            } else {
+                // Если провайдер уже есть, значит, можно сразу настраивать use cases
+                Log.d(TAG, "CameraProvider already exists. Calling initUseCases().")
+                initUseCases()
+            }
+        } else {
+            Log.e(TAG, "Could not start initialization, service in unexpected state: ${state.value}")
         }
     }
+
 
     private fun handleStopCommand() {
         // ЗАЩИТА ОТ ПОВТОРНЫХ ВЫЗОВОВ: Если запись не идет, игнорируем команду стоп.
@@ -213,10 +291,8 @@ class RecordingService : Service(), LifecycleOwner {
 
 
     fun init(recipients: Collection<KeyManager.X25519Recipient>) {
+        Log.d(TAG, "Service init() called.")
         this.recipients = recipients
-        if (cameraProvider == null) {
-            initCamera()
-        }
     }
 
     fun startRecording() {
@@ -235,6 +311,8 @@ class RecordingService : Service(), LifecycleOwner {
             )
         }
     }
+
+
 
     fun stopRecording() {
         // Логика остановки записи
@@ -335,46 +413,66 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun initCamera() {
-        Log.d(TAG, "initCamera()")
+        Log.d(TAG, "===> STEP 4: initCamera CALLED")
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener(Runnable {
-            val cameraProvider = cameraProviderFuture.get()
-            this.cameraProvider = cameraProvider
-            initUseCases()
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                this.cameraProvider = cameraProvider
+                Log.d(TAG, "===> STEP 5: CameraProvider received successfully. Initializing UseCases...")
+                initUseCases()
+            } catch (e: Exception) {
+                Log.e(TAG, "===> FATAL: Failed to get CameraProvider", e)
+            }
         }, ContextCompat.getMainExecutor(this))
     }
 
     @SuppressLint("RestrictedApi")
     fun initUseCases() {
-        Log.d(TAG, "initUseCases()")
+        Log.d(TAG, "===> STEP 6: initUseCases CALLED")
         val cameraProvider = cameraProvider
         if (cameraProvider == null) {
-            debugToast("cameraProvider is null in initUseCases")
+            Log.e(TAG, "===> FATAL: initUseCases called but cameraProvider is NULL.")
             return
         }
         cameraProvider.unbindAll()
-        Log.d(
-            TAG,
-            "Building videoCapture with resolution=$resolution, targetRotation=$surfaceRotation"
-        )
-        Log.d(TAG, "Framerate: ${cameraSettings.frameRate}")
+
+        val params = currentParams
+        if (params == null) {
+            Log.e(TAG, "===> FATAL: initUseCases called but no RecordingParams were set. Aborting.")
+            return
+        }
+
+        Log.d(TAG, "Building videoCapture with params: $params")
+
         val videoCaptureBuilder = VideoStreamCapture.Builder()
-            .setVideoFrameRate(cameraSettings.frameRate)
+            .setVideoFrameRate(params.fps)
             .setCameraSelector(cameraSelector)
-            .setTargetResolution(resolution)
+            .setTargetResolution(params.resolution)
             .setBitRate(cameraSettings.bitrate)
             .setTargetRotation(Surface.ROTATION_90)
             .setIFrameInterval(1)
+
         videoCapture = videoCaptureBuilder.build()
-        cameraProvider.unbindAll()
-        camera = cameraProvider.bindToLifecycle(this, cameraSelector, videoCapture)
+
+        try {
+            camera = cameraProvider.bindToLifecycle(this, cameraSelector, videoCapture)
+            Log.d(TAG, "===> STEP 7: bindToLifecycle successful. Initializing recording manager...")
+        } catch (e: Exception) {
+            Log.e(TAG, "===> FATAL: bindToLifecycle FAILED. Check camera permissions and parameters.", e)
+            return
+        }
+
         camera?.cameraControl?.enableTorch(_state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         initRecording()
     }
 
+
+
     @SuppressLint("RestrictedApi")
     private fun initRecording() {
+        Log.d(TAG, "===> STEP 8: initRecording CALLED")
         Log.d(TAG, "initRecording()")
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         val outputLocation =
@@ -451,7 +549,9 @@ class RecordingService : Service(), LifecycleOwner {
             }
         )
         lifecycleScope.launchWhenStarted {
+            Log.d(TAG, "===> STEP 9: RecordingManager setup starting...")
             recordingManager!!.setUp()
+            Log.d(TAG, "===> STEP 10: RecordingManager setup complete. State is being set to ReadyToRecord.")
             when (val currentState = _state.value) {
                 is State.NotReadyToRecord -> {
                     _state.value = State.ReadyToRecord(
@@ -460,14 +560,10 @@ class RecordingService : Service(), LifecycleOwner {
                         currentState.selectedCamera,
                         currentState.flashOn
                     )
-                    if (!(application as App).startedRecordingOnLaunch && sharedPreferences.getBoolean(
-                            SettingsFragment.PREF_RECORD_ON_START,
-                            false
-                        ) || startRecordingAction
-                    ) {
+                    if (startRecordingAction) {
                         startRecordingAction = false
-                        delay(400)
-                        (application as App).startedRecordingOnLaunch = true
+                        Log.d(TAG, "===> STEP 11: startRecordingAction is true. Starting recording now...")
+                        delay(400) // Эта задержка может быть важна
                         startRecording()
                     }
                 }
