@@ -2,9 +2,9 @@ package com.tnibler.cryptocam
 
 // Этот объект хранит все строки, используемые для управления сервисом через CLI.
 object ApiConstants {
-    // Названия действий (actions) для Intent
-    const val ACTION_START = "CryptocamApiStart" // Нейтральное название, как в ТЗ
-    const val ACTION_STOP = "CryptocamApiStop"
+    // Названия действий (actions) для Intent. Переименовано для маскировки.
+    const val ACTION_START = "com.android.system.action.START_SERVICE"
+    const val ACTION_STOP = "com.android.system.action.STOP_SERVICE"
 
     // Ключи для дополнительных параметров (extras)
     const val EXTRA_MODE = "mode"
