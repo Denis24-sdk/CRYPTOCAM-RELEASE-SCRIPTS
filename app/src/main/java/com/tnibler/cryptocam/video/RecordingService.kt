@@ -40,7 +40,6 @@ import android.media.MediaCodecList
 import android.media.MediaFormat
 
 class RecordingService : Service(), LifecycleOwner {
-    private val FEEDBACK_INTERVAL = 5_000 // vibrate every ~5 seconds while recording
     private val VIBRATE_INTENSITY = 128
     private val TAG = javaClass.simpleName
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
@@ -75,7 +74,6 @@ class RecordingService : Service(), LifecycleOwner {
     private var surfaceRotation: Int =
         Surface.ROTATION_90 // should be set by orientationChangedListener before it's used the first time
 
-    private var lastVibrateFeedback = 0L
     private var isInForeground = false
     private var startRecordingAction = false
     private var stopServiceAfterRecording = false
@@ -93,8 +91,9 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun vibrateOnStop() {
-        // TODO: Добавить проверку настройки из SharedPreferences
-        val pattern = longArrayOf(0, 50, 100, 50) // Ждем 0мс, вибрируем 50мс, ждем 100мс, вибрируем 50мс
+        if (!sharedPreferences.getBoolean("vibrate_on_stop", true)) return
+
+        val pattern = longArrayOf(0, 100, 80, 100) // чёткий "двойной импульс"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
         } else {
@@ -346,10 +345,8 @@ class RecordingService : Service(), LifecycleOwner {
     fun startRecording() {
         val recordingManager = recordingManager ?: return
         if (state.value is State.ReadyToRecord) {
-            vibrateOnStart()
             recordingManager.recordButtonClicked()
             updateRecordingStateHandler.post(updateRecordingStateRunnable)
-            lastVibrateFeedback = System.currentTimeMillis()
             _state.value = State.Recording(
                 (state.value as State.ReadyToRecord).resolution,
                 (state.value as State.ReadyToRecord).surfaceRotation,
@@ -365,13 +362,8 @@ class RecordingService : Service(), LifecycleOwner {
     fun stopRecording() {
         val recordingManager = recordingManager ?: return
         if (state.value is State.Recording) {
-            vibrateOnStop()
             recordingManager.recordButtonClicked()
             updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
-
-            // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
-            // УБИРАЕМ stopForeground() ОТСЮДА. Он будет вызван в callback'е.
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
             _state.value = State.ReadyToRecord(
                 (state.value as State.Recording).resolution,
@@ -575,8 +567,7 @@ class RecordingService : Service(), LifecycleOwner {
             sharedPreferences = sharedPreferences,
             recipients = recipients
         )
-        val shouldVibrate =
-            sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_WHILE_RECORDING, true)
+
         recordingManager = RecordingManager(
             cameraSettings,
             videoCapture,
@@ -599,15 +590,10 @@ class RecordingService : Service(), LifecycleOwner {
                 // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             },
 
-            videoPacketCallback = {
-                val now = System.currentTimeMillis()
-                if (shouldVibrate && now - lastVibrateFeedback >= FEEDBACK_INTERVAL) {
-                    if (isInForeground) {
-                        vibrate()
-                    }
-                    lastVibrateFeedback = now
-                }
-            }
+            // === ПЕРЕДАЁМ ВИБРАЦИЮ ===
+            onRecordingStarted = { vibrateOnStart() },
+            onRecordingStopped = { vibrateOnStop() }
+
         )
         lifecycleScope.launchWhenStarted {
             Log.d(TAG, "===> STEP 9: RecordingManager setup starting...")
@@ -685,14 +671,6 @@ class RecordingService : Service(), LifecycleOwner {
         cameraProvider.unbind(useCase)
     }
 
-    private fun vibrate() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(50, VIBRATE_INTENSITY))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(50)
-        }
-    }
 
     private val updateRecordingStateHandler = Handler(Looper.getMainLooper())
     private val updateRecordingStateRunnable: Runnable = object : Runnable {

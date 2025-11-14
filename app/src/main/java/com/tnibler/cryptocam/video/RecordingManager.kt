@@ -21,7 +21,9 @@ class RecordingManager(
     private val coroutineScope: CoroutineScope,
     private val outputFileManager: OutputFileManager,
     private val recordingStoppedCallback: (() -> Unit),
-    private val videoPacketCallback: (() -> Unit)? = null
+
+    private val onRecordingStarted: () -> Unit = {},      // Когда запись РЕАЛЬНО началась
+    private val onRecordingStopped: () -> Unit = {},      // Когда запись РЕАЛЬНО остановилась
 ) {
     private val TAG = javaClass.simpleName
     var state: State = State.NOT_RECORDING
@@ -43,7 +45,6 @@ class RecordingManager(
             override fun videoBufferReady(data: ByteArray, presentationTimeUs: Long) {
                 encryptingHandler.post {
                     videoFile?.writeVideoBuffer(data, presentationTimeUs)
-                    videoPacketCallback?.invoke()
                 }
             }
 
@@ -75,11 +76,13 @@ class RecordingManager(
                     })
                 recordingStartMillis = System.currentTimeMillis()
                 state = State.RECORDING
+                onRecordingStarted()
             }
             State.RECORDING -> {
                 Log.d(TAG, "stopping recording")
                 videoCapture.stopRecording()
                 state = State.NOT_RECORDING
+                onRecordingStopped()
             }
         }
         return state
