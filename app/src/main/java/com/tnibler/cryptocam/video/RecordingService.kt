@@ -483,6 +483,11 @@ class RecordingService : Service(), LifecycleOwner {
         }, ContextCompat.getMainExecutor(this))
     }
 
+
+
+
+
+
     @SuppressLint("RestrictedApi", "UnsafeOptInUsageError")
     @OptIn(ExperimentalCamera2Interop::class)
     fun initUseCases() {
@@ -496,33 +501,62 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
-        val cameraSelectorBuilder = CameraSelector.Builder()
-            .requireLensFacing(
-                if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT
-                else CameraSelector.LENS_FACING_BACK
-            )
+        // --- НАЧАЛО БЛОКА ВЫБОРА КАМЕРЫ С ФОЛЛБЭКОМ ---
+        val requestedIdKey = when (params.mode) {
+            ApiConstants.MODE_DAY -> SettingsFragment.PREF_CAMERA_ID_DAY
+            ApiConstants.MODE_NIGHT -> SettingsFragment.PREF_CAMERA_ID_NIGHT
+            ApiConstants.MODE_FRONT -> SettingsFragment.PREF_CAMERA_ID_FRONT
+            else -> null
+        }
 
-        if (params.useUltraWide) {
-            Log.d(TAG, "Attempting to find and select an ultra-wide camera.")
-            cameraSelectorBuilder.addCameraFilter { cameraInfoList: List<CameraInfo> ->
-                val widestCamera = cameraInfoList.minByOrNull { cameraInfo ->
-                    try {
-                        val characteristics = Camera2CameraInfo.extractCameraCharacteristics(cameraInfo)
-                        val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-                        focalLengths?.minOrNull() ?: Float.MAX_VALUE
-                    } catch (e: Exception) {
-                        Float.MAX_VALUE
-                    }
+        val customCameraId = requestedIdKey?.let { sharedPreferences.getString(it, null)?.trim() }
+
+        val cameraSelectorBuilder = CameraSelector.Builder()
+
+        if (!customCameraId.isNullOrBlank()) {
+            Log.d(TAG, "Manual camera ID specified: '$customCameraId'. Attempting to select.")
+            cameraSelectorBuilder.addCameraFilter { cameraInfoList ->
+                val matchingCamera = cameraInfoList.firstOrNull { cameraInfo ->
+                    Camera2CameraInfo.from(cameraInfo).cameraId == customCameraId
                 }
-                if (widestCamera != null) {
-                    val cameraId = Camera2CameraInfo.from(widestCamera).cameraId
-                    Log.d(TAG, "Selected camera with smallest focal length: $cameraId")
-                    listOf(widestCamera)
+                if (matchingCamera != null) {
+                    Log.d(TAG, "Successfully found camera with ID '$customCameraId'.")
+                    listOf(matchingCamera)
                 } else {
+                    Log.w(TAG, "Camera with ID '$customCameraId' NOT FOUND. Falling back to default logic.")
+                    // Если не нашли, возвращаем исходный список, чтобы сработал фоллбэк
                     cameraInfoList
                 }
             }
+        } else {
+            Log.d(TAG, "No manual camera ID. Using auto-detection logic.")
+            // Если ID не указан, используем автоматику
+            if (params.useUltraWide) {
+                Log.d(TAG, "Auto-detection: searching for wide-angle camera.")
+                cameraSelectorBuilder.addCameraFilter { cameraInfoList ->
+                    val widestCamera = cameraInfoList.minByOrNull { cameraInfo ->
+                        try {
+                            val characteristics = Camera2CameraInfo.extractCameraCharacteristics(cameraInfo)
+                            val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                            focalLengths?.minOrNull() ?: Float.MAX_VALUE
+                        } catch (e: Exception) { Float.MAX_VALUE }
+                    }
+                    if (widestCamera != null) {
+                        val cameraId = Camera2CameraInfo.from(widestCamera).cameraId
+                        Log.d(TAG, "Auto-detection: selected camera with smallest focal length: $cameraId")
+                        listOf(widestCamera)
+                    } else {
+                        cameraInfoList
+                    }
+                }
+            } else {
+                // Для ночного и фронтального режима просто выбираем по направлению
+                val lensFacing = if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
+                Log.d(TAG, "Auto-detection: selecting camera with LENS_FACING = $lensFacing")
+                cameraSelectorBuilder.requireLensFacing(lensFacing)
+            }
         }
+        // --- КОНЕЦ БЛОКА ВЫБОРА КАМЕРЫ ---
 
         val finalCameraSelector = cameraSelectorBuilder.build()
 
@@ -532,9 +566,6 @@ class RecordingService : Service(), LifecycleOwner {
             finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
         }
 
-        // --- НАЧАЛО ИЗМЕНЕНИЙ (Правильный фоллбэк) ---
-
-        // ФУНКЦИЯ ДЛЯ СОЗДАНИЯ БИЛДЕРА, ЧТОБЫ НЕ ДУБЛИРОВАТЬ КОД
         fun createVideoCaptureBuilder(): VideoStreamCapture.Builder {
             return VideoStreamCapture.Builder()
                 .setVideoFrameRate(params.fps)
@@ -546,7 +577,6 @@ class RecordingService : Service(), LifecycleOwner {
                 .setVideoCodec(finalCodec)
         }
 
-        // 1. Создаем билдер С РАСШИРЕННЫМИ НАСТРОЙКАМИ
         val builderWithSettings = createVideoCaptureBuilder()
         val extender = Camera2Interop.Extender(builderWithSettings)
 
@@ -560,7 +590,6 @@ class RecordingService : Service(), LifecycleOwner {
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
 
         try {
-            // 2. Пытаемся привязать UseCase с настройками
             Log.d(TAG, "Attempting to bind with custom settings...")
             videoCapture = builderWithSettings.build()
             camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
@@ -569,18 +598,16 @@ class RecordingService : Service(), LifecycleOwner {
         } catch (e: Exception) {
             Log.e(TAG, "Bind with custom settings FAILED. Falling back to default.", e)
             try {
-                // 3. Если не получилось, создаем и привязываем UseCase БЕЗ настроек
-                cameraProvider.unbindAll() // На всякий случай отвязываем всё перед второй попыткой
+                cameraProvider.unbindAll()
                 val fallbackBuilder = createVideoCaptureBuilder()
                 videoCapture = fallbackBuilder.build()
                 camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
                 Log.d(TAG, "===> STEP 7 (Fallback): bindToLifecycle successful WITHOUT custom settings.")
             } catch (e2: Exception) {
                 Log.e(TAG, "===> FATAL: Fallback bind also FAILED. Cannot initialize camera.", e2)
-                return // Если и это не сработало, то выходим
+                return
             }
         }
-        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         camera?.cameraControl?.enableTorch(_state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
