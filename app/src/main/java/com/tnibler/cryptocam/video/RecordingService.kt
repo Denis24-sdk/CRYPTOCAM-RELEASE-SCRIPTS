@@ -1,10 +1,7 @@
 package com.tnibler.cryptocam.video
 
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.SensorManager
@@ -15,7 +12,6 @@ import android.util.Log
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
-import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -38,19 +34,14 @@ import java.time.Duration
 import android.content.pm.PackageManager
 import android.media.MediaCodecList
 import android.media.MediaFormat
-
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraFilter
 import androidx.camera.core.ExperimentalCameraFilter
 import android.hardware.camera2.CameraCharacteristics
-
-
-
 import android.hardware.camera2.CaptureRequest
 import android.util.Range
 import androidx.camera.camera2.interop.Camera2Interop
-import androidx.camera.core.CameraInfo
 import androidx.core.app.NotificationCompat
 
 
@@ -95,6 +86,10 @@ class RecordingService : Service(), LifecycleOwner {
     private var stopServiceAfterRecording = false
 
     private val vibrator by lazy { ContextCompat.getSystemService(this, Vibrator::class.java)!! }
+
+    // [НОВЫЙ КОД] Флаги для управления очередью и состоянием остановки
+    @Volatile private var isStopping = false
+    private var pendingStartIntent: Intent? = null
 
     private fun vibrateOnStart() {
         // TODO: Добавить проверку настройки из SharedPreferences
@@ -170,8 +165,7 @@ class RecordingService : Service(), LifecycleOwner {
         (applicationContext as App).recordingService = null
     }
 
-    private var currentParams: RecordingParams? = null // Храним параметры текущей записи
-    @Volatile private var isStopping = false
+    private var currentParams: RecordingParams? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand() with action: ${intent?.action}")
@@ -182,24 +176,21 @@ class RecordingService : Service(), LifecycleOwner {
 
         when (intent.action) {
             ApiConstants.ACTION_START -> {
-                Log.d(TAG, "Foregrounding service to handle API start command.")
-                foreground()
                 handleStartCommand(intent)
             }
             ApiConstants.ACTION_STOP -> {
-                // Уведомление уже должно быть, так как сервис работает. Просто вызываем остановку.
                 handleStopCommand()
             }
             ACTION_TOGGLE_RECORDING -> {
                 Log.d(TAG, "ACTION_TOGGLE_RECORDING received")
                 if (state.value is State.Recording) {
-                    handleStopCommand() // Используем общую логику остановки
+                    handleStopCommand()
                 } else if (state.value is State.ReadyToRecord) {
                     val defaultIntent = Intent().apply {
+                        action = ApiConstants.ACTION_START // [ИЗМЕНЕНО] Устанавливаем action для корректной обработки
                         putExtra(ApiConstants.EXTRA_MODE, ApiConstants.MODE_DAY)
                         putExtra(ApiConstants.EXTRA_RESOLUTION, "FHD")
                     }
-                    foreground() // Перед стартом нужно показать уведомление
                     handleStartCommand(defaultIntent)
                 }
             }
@@ -209,12 +200,19 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun handleStartCommand(intent: Intent) {
-        if (state.value is State.Recording || isStopping) {
-            Log.w(TAG, "Start command received, but recording is already in progress or stopping. Ignoring.")
+        // [ИЗМЕНЕНО] Улучшенная логика защиты от спама и постановки в очередь
+        if (state.value is State.Recording) {
+            Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
+            return
+        }
+        if (isStopping) {
+            Log.w(TAG, "Start command received while stopping. Queuing command.")
+            pendingStartIntent = intent // Ставим в очередь
             return
         }
 
         Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
+        foreground() // Показываем уведомление ПЕРЕД началом любых действий с камерой
 
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
@@ -333,25 +331,21 @@ class RecordingService : Service(), LifecycleOwner {
 
 
     private fun handleStopCommand() {
+        // [ИЗМЕНЕНО] Улучшенная логика защиты от спама
         if (state.value !is State.Recording) {
             Log.w(TAG, "Stop command received, but not recording. Ignoring.")
             return
         }
-        // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
         if (isStopping) {
             Log.w(TAG, "Stop command received, but service is already in stopping process. Ignoring.")
             return
         }
-        isStopping = true
-        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
+        isStopping = true // [НОВЫЙ КОД] Устанавливаем флаг, что мы в процессе остановки
         Log.d(TAG, "Stopping recording via command.")
-        // Устанавливаем флаг, чтобы callback знал, что нужно остановить сервис
         stopServiceAfterRecording = true
         stopRecording()
     }
-
-
 
     fun init(recipients: Collection<KeyManager.X25519Recipient>) {
         Log.d(TAG, "Service init() called.")
@@ -373,8 +367,6 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
-
-
     fun stopRecording() {
         val recordingManager = recordingManager ?: return
         if (state.value is State.Recording) {
@@ -389,8 +381,6 @@ class RecordingService : Service(), LifecycleOwner {
             )
         }
     }
-
-
 
     fun toggleFlash() {
         val currentState = _state.value
@@ -483,11 +473,6 @@ class RecordingService : Service(), LifecycleOwner {
         }, ContextCompat.getMainExecutor(this))
     }
 
-
-
-
-
-
     @SuppressLint("RestrictedApi", "UnsafeOptInUsageError")
     @OptIn(ExperimentalCamera2Interop::class)
     fun initUseCases() {
@@ -501,7 +486,6 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
-        // --- НАЧАЛО БЛОКА ВЫБОРА КАМЕРЫ С ФОЛЛБЭКОМ ---
         val requestedIdKey = when (params.mode) {
             ApiConstants.MODE_DAY -> SettingsFragment.PREF_CAMERA_ID_DAY
             ApiConstants.MODE_NIGHT -> SettingsFragment.PREF_CAMERA_ID_NIGHT
@@ -524,13 +508,11 @@ class RecordingService : Service(), LifecycleOwner {
                     listOf(matchingCamera)
                 } else {
                     Log.w(TAG, "Camera with ID '$customCameraId' NOT FOUND. Falling back to default logic.")
-                    // Если не нашли, возвращаем исходный список, чтобы сработал фоллбэк
                     cameraInfoList
                 }
             }
         } else {
             Log.d(TAG, "No manual camera ID. Using auto-detection logic.")
-            // Если ID не указан, используем автоматику
             if (params.useUltraWide) {
                 Log.d(TAG, "Auto-detection: searching for wide-angle camera.")
                 cameraSelectorBuilder.addCameraFilter { cameraInfoList ->
@@ -550,13 +532,11 @@ class RecordingService : Service(), LifecycleOwner {
                     }
                 }
             } else {
-                // Для ночного и фронтального режима просто выбираем по направлению
                 val lensFacing = if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
                 Log.d(TAG, "Auto-detection: selecting camera with LENS_FACING = $lensFacing")
                 cameraSelectorBuilder.requireLensFacing(lensFacing)
             }
         }
-        // --- КОНЕЦ БЛОКА ВЫБОРА КАМЕРЫ ---
 
         val finalCameraSelector = cameraSelectorBuilder.build()
 
@@ -614,14 +594,9 @@ class RecordingService : Service(), LifecycleOwner {
         initRecording()
     }
 
-
-
-
-
     @SuppressLint("RestrictedApi")
     private fun initRecording() {
         Log.d(TAG, "===> STEP 8: initRecording CALLED")
-        Log.d(TAG, "initRecording()")
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         val outputLocation =
             sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
@@ -680,20 +655,29 @@ class RecordingService : Service(), LifecycleOwner {
             lifecycleScope,
             outputFileManager!!,
             recordingStoppedCallback = {
-                // --- НАЧАЛО ИЗМЕНЕНИЙ (Исправление гонки состояний) ---
+                // [ИЗМЕНЕНО] Центральная точка управления после остановки
                 Log.d(TAG, "RecordingManager: recordingStoppedCallback triggered.")
                 isStopping = false // Сбрасываем флаг
-                if (stopServiceAfterRecording) {
-                    Log.d(TAG, "Callback: Stopping foreground and self.")
-                    // Теперь это безопасное место для остановки сервиса
-                    stopForeground(true)
-                    isInForeground = false
-                    stopSelf()
-                }
-                // --- КОНЕЦ ИЗМЕНЕНИЙ ---
-            },
 
-            // === ПЕРЕДАЁМ ВИБРАЦИЮ ===
+                if (stopServiceAfterRecording) {
+                    stopServiceAfterRecording = false // Сбрасываем флаг, чтобы не остановить сервис случайно в будущем
+                    val hasPendingStart = pendingStartIntent != null
+                    // Если нет задачи на новый старт, то останавливаем сервис
+                    if (!hasPendingStart) {
+                        Log.d(TAG, "Callback: No pending start. Stopping foreground and self.")
+                        background()
+                        stopSelf()
+                    }
+                }
+
+                // [НОВЫЙ КОД] Проверяем, есть ли в очереди команда на запуск
+                pendingStartIntent?.let {
+                    Log.d(TAG, "Callback: Found pending start intent. Handling it now.")
+                    val intentToStart = it
+                    pendingStartIntent = null // Очищаем очередь
+                    handleStartCommand(intentToStart)
+                }
+            },
             onRecordingStarted = { vibrateOnStart() },
             onRecordingStopped = { vibrateOnStop() }
 
@@ -780,11 +764,15 @@ class RecordingService : Service(), LifecycleOwner {
         override fun run() {
             val recordingManager = recordingManager
             if (recordingManager == null) {
-                debugToast("recordingManagerNull in updateRecordingStateRunnable")
+                // [ИЗМЕНЕНО] Не крашимся, а просто прекращаем обновление
+                // debugToast("recordingManagerNull in updateRecordingStateRunnable")
                 return
             }
-            _state.value =
-                (_state.value as State.Recording).copy(recordingTime = recordingManager.recordingTime)
+            val currentState = _state.value
+            if (currentState is State.Recording) {
+                _state.value = currentState.copy(recordingTime = recordingManager.recordingTime)
+            }
+
             if (isInForeground) {
                 val d = recordingManager.recordingTime
                 val text = if (d.toHours() > 0) {
@@ -820,11 +808,6 @@ class RecordingService : Service(), LifecycleOwner {
         return Size(s[0].toInt(), s[1].toInt())
     }
 
-    private fun buildNotificationRemoteViews(): RemoteViews {
-        val remoteView = RemoteViews(packageName, R.layout.custom_notification_pixel)
-        return remoteView
-    }
-
     override val lifecycle: Lifecycle
         get() = lifecycleRegistry
 
@@ -837,6 +820,11 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onUnbind(intent: Intent?): Boolean {
         isBound = false
+        // [ИЗМЕНЕНО] Если сервис не записывает видео, когда от него отключается UI, он должен остановиться
+        if (state.value !is State.Recording) {
+            Log.d(TAG, "onUnbind: not recording, stopping self.")
+            stopSelf()
+        }
         return super.onUnbind(intent)
     }
 
