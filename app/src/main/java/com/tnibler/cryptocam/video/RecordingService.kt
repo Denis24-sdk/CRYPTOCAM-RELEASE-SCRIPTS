@@ -496,7 +496,7 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
-        var cameraSelectorBuilder = CameraSelector.Builder()
+        val cameraSelectorBuilder = CameraSelector.Builder()
             .requireLensFacing(
                 if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT
                 else CameraSelector.LENS_FACING_BACK
@@ -504,29 +504,24 @@ class RecordingService : Service(), LifecycleOwner {
 
         if (params.useUltraWide) {
             Log.d(TAG, "Attempting to find and select an ultra-wide camera.")
-            // --- НАЧАЛО ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
             cameraSelectorBuilder.addCameraFilter { cameraInfoList: List<CameraInfo> ->
-                // Находим камеру с наименьшим фокусным расстоянием. Это самый простой и надежный способ.
                 val widestCamera = cameraInfoList.minByOrNull { cameraInfo ->
                     try {
-                        // ЕДИНСТВЕННЫЙ ПРАВИЛЬНЫЙ СПОСОБ ПОЛУЧИТЬ ХАРАКТЕРИСТИКИ
                         val characteristics = Camera2CameraInfo.extractCameraCharacteristics(cameraInfo)
                         val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
                         focalLengths?.minOrNull() ?: Float.MAX_VALUE
                     } catch (e: Exception) {
-                        Float.MAX_VALUE // Если что-то пошло не так, считаем эту камеру неподходящей
+                        Float.MAX_VALUE
                     }
                 }
-
                 if (widestCamera != null) {
                     val cameraId = Camera2CameraInfo.from(widestCamera).cameraId
                     Log.d(TAG, "Selected camera with smallest focal length: $cameraId")
                     listOf(widestCamera)
                 } else {
-                    cameraInfoList // Если ничего не нашли, возвращаем исходный список
+                    cameraInfoList
                 }
             }
-            // --- КОНЕЦ ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
         }
 
         val finalCameraSelector = cameraSelectorBuilder.build()
@@ -537,36 +532,55 @@ class RecordingService : Service(), LifecycleOwner {
             finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
         }
 
-        Log.d(TAG, "Building videoCapture with params: $params")
+        // --- НАЧАЛО ИЗМЕНЕНИЙ (Правильный фоллбэк) ---
 
-        val videoCaptureBuilder = VideoStreamCapture.Builder()
-            .setVideoFrameRate(params.fps)
-            .setCameraSelector(finalCameraSelector)
-            .setTargetResolution(params.resolution)
-            .setBitRate(cameraSettings.bitrate)
-            .setTargetRotation(Surface.ROTATION_90)
-            .setIFrameInterval(1)
-            .setVideoCodec(finalCodec)
+        // ФУНКЦИЯ ДЛЯ СОЗДАНИЯ БИЛДЕРА, ЧТОБЫ НЕ ДУБЛИРОВАТЬ КОД
+        fun createVideoCaptureBuilder(): VideoStreamCapture.Builder {
+            return VideoStreamCapture.Builder()
+                .setVideoFrameRate(params.fps)
+                .setCameraSelector(finalCameraSelector)
+                .setTargetResolution(params.resolution)
+                .setBitRate(cameraSettings.bitrate)
+                .setTargetRotation(Surface.ROTATION_90)
+                .setIFrameInterval(1)
+                .setVideoCodec(finalCodec)
+        }
+
+        // 1. Создаем билдер С РАСШИРЕННЫМИ НАСТРОЙКАМИ
+        val builderWithSettings = createVideoCaptureBuilder()
+        val extender = Camera2Interop.Extender(builderWithSettings)
 
         if (params.fps >= 50) {
             Log.d(TAG, "Applying high-speed FPS range via Camera2Interop")
-            val extender = Camera2Interop.Extender(videoCaptureBuilder)
-            extender.setCaptureRequestOption(
-                CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                Range(params.fps, params.fps)
-            )
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(params.fps, params.fps))
         }
 
-        videoCapture = videoCaptureBuilder.build()
+        Log.d(TAG, "Applying stabilization settings: OIS=${params.isOisEnabled}, EIS=${params.isEisEnabled}")
+        extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON else CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF)
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
 
         try {
-            camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture)
-            Log.d(TAG, "===> STEP 7: bindToLifecycle successful. Initializing recording manager...")
+            // 2. Пытаемся привязать UseCase с настройками
+            Log.d(TAG, "Attempting to bind with custom settings...")
+            videoCapture = builderWithSettings.build()
+            camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
+            Log.d(TAG, "===> STEP 7: bindToLifecycle successful WITH custom settings.")
+
         } catch (e: Exception) {
-            Log.e(TAG, "===> FATAL: bindToLifecycle FAILED. Check camera permissions and parameters.", e)
-            Log.e(TAG, "Failed with selector: $finalCameraSelector and params: $params")
-            return
+            Log.e(TAG, "Bind with custom settings FAILED. Falling back to default.", e)
+            try {
+                // 3. Если не получилось, создаем и привязываем UseCase БЕЗ настроек
+                cameraProvider.unbindAll() // На всякий случай отвязываем всё перед второй попыткой
+                val fallbackBuilder = createVideoCaptureBuilder()
+                videoCapture = fallbackBuilder.build()
+                camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
+                Log.d(TAG, "===> STEP 7 (Fallback): bindToLifecycle successful WITHOUT custom settings.")
+            } catch (e2: Exception) {
+                Log.e(TAG, "===> FATAL: Fallback bind also FAILED. Cannot initialize camera.", e2)
+                return // Если и это не сработало, то выходим
+            }
         }
+        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         camera?.cameraControl?.enableTorch(_state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
