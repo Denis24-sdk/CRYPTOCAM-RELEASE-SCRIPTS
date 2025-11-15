@@ -24,6 +24,7 @@ import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
 import com.tnibler.cryptocam.photo.PhotoKey
 import com.tnibler.cryptocam.photo.PhotoViewModel
 import com.tnibler.cryptocam.preference.SettingsFragment
+import com.tnibler.cryptocam.video.CameraDebugKey
 import com.tnibler.cryptocam.video.VideoKey
 import com.zhuinden.simplestack.SimpleStateChanger
 import com.zhuinden.simplestack.StateChange
@@ -118,6 +119,27 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         val action = intent?.action
         val data = intent?.data
         Log.d(TAG, "action $action, data $data")
+
+        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        // Проверяем, пришла ли наша новая команда
+        if (action == "com.tnibler.cryptocam.SHOW_DEBUG_SCREEN") {
+            Log.d(TAG, "Debug screen action received")
+            // Создаем историю навигации с одним нашим экраном
+            val initialHistory = listOf(CameraDebugKey())
+            if (!isNavigationSetUp) {
+                Navigator.configure()
+                    .setGlobalServices((application as App).globalServices)
+                    .setScopedServices(DefaultServiceProvider())
+                    .setStateChanger(SimpleStateChanger(this@MainActivity))
+                    .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+                isNavigationSetUp = true
+            } else {
+                // Если приложение уже было запущено, просто переходим на экран
+                backstack.setHistory(initialHistory, StateChange.REPLACE)
+            }
+            return // Важно выйти из функции здесь
+        }
+
         if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
             Log.d(TAG, "import key deep link")
             // import key from deep link qr code
