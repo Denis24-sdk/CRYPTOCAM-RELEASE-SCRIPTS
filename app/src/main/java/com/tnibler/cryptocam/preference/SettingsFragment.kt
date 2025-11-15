@@ -151,16 +151,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         screen.addPreference(vibrateOnPhotoPreference)
 
-        val customNotificationPreference = Preference(context).apply {
-            key = "customNotification"
-            setTitle(R.string.custom_notification_settings)
-            setSummary(R.string.custom_notification_summary)
-            setOnPreferenceClickListener {
-                backstack.goTo(CustomNotificationSettingsKey())
-                true
-            }
-        }
-        screen.addPreference(customNotificationPreference)
+
 
         val fileNamePreference = EditTextPreference(context).apply {
             setDefaultValue("cryptocam-\$num.age")

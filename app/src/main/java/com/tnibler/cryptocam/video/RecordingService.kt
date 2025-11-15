@@ -51,7 +51,7 @@ import android.hardware.camera2.CaptureRequest
 import android.util.Range
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.CameraInfo
-
+import androidx.core.app.NotificationCompat
 
 
 @ExperimentalCameraFilter
@@ -770,7 +770,8 @@ class RecordingService : Service(), LifecycleOwner {
                 } else {
                     String.format("%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
                 }
-                val n = notificationBuilder.setContentText(getString(R.string.notification_text, text))
+                val n = (notificationBuilder as NotificationCompat.Builder)
+                    .setContentText(getString(R.string.notification_text, text))
                     .build()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
