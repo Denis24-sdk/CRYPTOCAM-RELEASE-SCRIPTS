@@ -39,6 +39,22 @@ import android.content.pm.PackageManager
 import android.media.MediaCodecList
 import android.media.MediaFormat
 
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.CameraFilter
+import androidx.camera.core.ExperimentalCameraFilter
+import android.hardware.camera2.CameraCharacteristics
+
+
+
+import android.hardware.camera2.CaptureRequest
+import android.util.Range
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.core.CameraInfo
+
+
+
+@ExperimentalCameraFilter
 class RecordingService : Service(), LifecycleOwner {
     private val VIBRATE_INTENSITY = 128
     private val TAG = javaClass.simpleName
@@ -467,7 +483,8 @@ class RecordingService : Service(), LifecycleOwner {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    @SuppressLint("RestrictedApi")
+    @SuppressLint("RestrictedApi", "UnsafeOptInUsageError")
+    @OptIn(ExperimentalCamera2Interop::class)
     fun initUseCases() {
         Log.d(TAG, "===> STEP 6: initUseCases CALLED")
         val cameraProvider = cameraProvider ?: return
@@ -479,32 +496,75 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
+        var cameraSelectorBuilder = CameraSelector.Builder()
+            .requireLensFacing(
+                if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT
+                else CameraSelector.LENS_FACING_BACK
+            )
+
+        if (params.useUltraWide) {
+            Log.d(TAG, "Attempting to find and select an ultra-wide camera.")
+            // --- НАЧАЛО ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
+            cameraSelectorBuilder.addCameraFilter { cameraInfoList: List<CameraInfo> ->
+                // Находим камеру с наименьшим фокусным расстоянием. Это самый простой и надежный способ.
+                val widestCamera = cameraInfoList.minByOrNull { cameraInfo ->
+                    try {
+                        // ЕДИНСТВЕННЫЙ ПРАВИЛЬНЫЙ СПОСОБ ПОЛУЧИТЬ ХАРАКТЕРИСТИКИ
+                        val characteristics = Camera2CameraInfo.extractCameraCharacteristics(cameraInfo)
+                        val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                        focalLengths?.minOrNull() ?: Float.MAX_VALUE
+                    } catch (e: Exception) {
+                        Float.MAX_VALUE // Если что-то пошло не так, считаем эту камеру неподходящей
+                    }
+                }
+
+                if (widestCamera != null) {
+                    val cameraId = Camera2CameraInfo.from(widestCamera).cameraId
+                    Log.d(TAG, "Selected camera with smallest focal length: $cameraId")
+                    listOf(widestCamera)
+                } else {
+                    cameraInfoList // Если ничего не нашли, возвращаем исходный список
+                }
+            }
+            // --- КОНЕЦ ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
+        }
+
+        val finalCameraSelector = cameraSelectorBuilder.build()
+
         var finalCodec = MediaFormat.MIMETYPE_VIDEO_AVC
         if (params.codec == ApiConstants.CODEC_HEVC) {
             Log.d(TAG, "HEVC codec requested. Attempting to use it.")
             finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
         }
 
-
-
         Log.d(TAG, "Building videoCapture with params: $params")
 
         val videoCaptureBuilder = VideoStreamCapture.Builder()
             .setVideoFrameRate(params.fps)
-            .setCameraSelector(cameraSelector)
+            .setCameraSelector(finalCameraSelector)
             .setTargetResolution(params.resolution)
             .setBitRate(cameraSettings.bitrate)
             .setTargetRotation(Surface.ROTATION_90)
             .setIFrameInterval(1)
             .setVideoCodec(finalCodec)
 
+        if (params.fps >= 50) {
+            Log.d(TAG, "Applying high-speed FPS range via Camera2Interop")
+            val extender = Camera2Interop.Extender(videoCaptureBuilder)
+            extender.setCaptureRequestOption(
+                CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                Range(params.fps, params.fps)
+            )
+        }
+
         videoCapture = videoCaptureBuilder.build()
 
         try {
-            camera = cameraProvider.bindToLifecycle(this, cameraSelector, videoCapture)
+            camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture)
             Log.d(TAG, "===> STEP 7: bindToLifecycle successful. Initializing recording manager...")
         } catch (e: Exception) {
             Log.e(TAG, "===> FATAL: bindToLifecycle FAILED. Check camera permissions and parameters.", e)
+            Log.e(TAG, "Failed with selector: $finalCameraSelector and params: $params")
             return
         }
 
@@ -512,6 +572,8 @@ class RecordingService : Service(), LifecycleOwner {
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         initRecording()
     }
+
+
 
 
 
