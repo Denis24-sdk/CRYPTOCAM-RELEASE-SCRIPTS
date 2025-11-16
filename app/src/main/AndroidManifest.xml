@@ -41,6 +41,7 @@
         <activity
             android:name=".StartReceiverActivity"
             android:exported="true"
+            android:theme="@style/Theme.App.NoDisplay"
             android:taskAffinity=""
             android:excludeFromRecents="true">
             <intent-filter>

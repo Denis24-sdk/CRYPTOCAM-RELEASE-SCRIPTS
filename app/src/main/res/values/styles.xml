@@ -29,4 +29,15 @@
         <item name="android:buttonBarStyle">?android:attr/buttonBarStyle</item>
     </style>
 
+    <style name="Theme.App.NoDisplay" parent="Theme.AppCompat.NoActionBar">
+        <!-- Делаем фон окна прозрачным -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <!-- Указываем, что окно полупрозрачное -->
+        <item name="android:windowIsTranslucent">true</item>
+        <!-- Отключаем анимацию появления и исчезновения окна -->
+        <item name="android:windowAnimationStyle">@null</item>
+        <!-- Указываем системе, что у этого окна нет видимого содержимого -->
+        <item name="android:windowNoDisplay">true</item>
+    </style>
+
 </resources>
