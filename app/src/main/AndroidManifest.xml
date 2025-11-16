@@ -34,9 +34,13 @@
         </activity>
 
         <activity
+            android:name=".PermissionRationaleActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaterialComponents.DayNight.Dialog.Alert" />
+
+        <activity
             android:name=".StartReceiverActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:taskAffinity=""
             android:excludeFromRecents="true">
             <intent-filter>
