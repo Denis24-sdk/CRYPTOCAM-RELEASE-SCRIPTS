@@ -6,6 +6,11 @@ object ApiConstants {
     const val ACTION_START = "com.android.system.action.START_SERVICE"
     const val ACTION_STOP = "com.android.system.action.STOP_SERVICE"
 
+    // [НОВОЕ] Action для вызова экрана выбора папки через CLI
+    const val ACTION_OPEN_OUTPUT_PICKER = "com.android.system.action.PICK_OUTPUT"
+    // [НОВОЕ] Action для внутреннего использования: принудительно показать выбор папки, если она не задана
+    const val ACTION_FORCE_OUTPUT_PICKER = "com.android.system.action.FORCE_PICK_OUTPUT"
+
     // [НОВОЕ] Actions для вызова Activity
     const val ACTION_OPEN_SETTINGS = "com.android.system.action.OPEN_SETTINGS"
     const val ACTION_OPEN_KEYS = "com.android.system.action.OPEN_KEYS"

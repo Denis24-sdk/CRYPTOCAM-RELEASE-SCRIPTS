@@ -125,6 +125,14 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 regularStart(KeysKey())
                 return
             }
+            // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            ApiConstants.ACTION_OPEN_OUTPUT_PICKER,
+            ApiConstants.ACTION_FORCE_OUTPUT_PICKER -> {
+                Log.d(TAG, "Output picker screen action received")
+                regularStart(PickOutputDirKey())
+                return
+            }
+            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             ApiConstants.ACTION_CHECK_ENCRYPTION_KEY -> {
                 Log.d(TAG, "Check encryption key action received")
                 val keys = runBlocking { keyManager.availableKeys.first() }
@@ -136,6 +144,7 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 return
             }
         }
+
 
         if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
             Log.d(TAG, "import key deep link")
