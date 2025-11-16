@@ -1,26 +1,35 @@
 package com.tnibler.cryptocam.video
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.SensorManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
+import android.media.MediaCodecList
+import android.media.MediaFormat
 import android.net.Uri
 import android.os.*
-import android.service.quicksettings.TileService
 import android.util.Log
+import android.util.Range
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.Toast
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.*
+import androidx.camera.core.ExperimentalCameraFilter
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.lifecycleScope
+import androidx.core.net.toUri
+import androidx.lifecycle.*
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.*
 import com.tnibler.cryptocam.R
@@ -30,24 +39,15 @@ import com.zhuinden.simplestackextensions.servicesktx.get
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.Duration
-import android.content.pm.PackageManager
-import android.media.MediaCodecList
-import android.media.MediaFormat
-import androidx.camera.camera2.interop.Camera2CameraInfo
-import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.camera.core.CameraFilter
-import androidx.camera.core.ExperimentalCameraFilter
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CaptureRequest
-import android.util.Range
-import androidx.camera.camera2.interop.Camera2Interop
-import androidx.core.app.NotificationCompat
-
+import java.util.*
 
 @ExperimentalCameraFilter
+@ExperimentalCamera2Interop // <-- [ИСПРАВЛЕНО] Добавлена аннотация
 class RecordingService : Service(), LifecycleOwner {
-    private val VIBRATE_INTENSITY = 128
     private val TAG = javaClass.simpleName
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private val binder = RecordingServiceBinder()
@@ -55,87 +55,53 @@ class RecordingService : Service(), LifecycleOwner {
     private val notificationManager by lazy { NotificationManagerCompat.from(this) }
     private val notificationId = 1
     private val notificationBuilder by lazy { notificationBuilder(this) }
-
-    private var recipients: Collection<KeyManager.X25519Recipient> = setOf()
-    private var outputFileManager: OutputFileManager? = null
     private var recordingManager: RecordingManager? = null
-    private val _state: MutableStateFlow<State> =
-        MutableStateFlow(State.NotReadyToRecord(false, SelectedCamera.BACK, flashOn = false))
+    private val _state: MutableStateFlow<State> = MutableStateFlow(State.NotReadyToRecord(false, SelectedCamera.BACK, flashOn = false))
     val state = _state.asStateFlow()
-
-    private lateinit var cameraSettings: CameraSettings
-    private var cameraSelector = CameraSelector.Builder()
-        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-        .build()
-
+    private var cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
     private val lifecycleRegistry = LifecycleRegistry(this)
     private var cameraProvider: ProcessCameraProvider? = null
     private var videoCapture: VideoStreamCapture? = null
     private var camera: Camera? = null
     private lateinit var resolution: Size
-    private val orientationEventListener: OrientationEventListener by lazy {
-        buildOrientationEventListener()
-    }
-    var lastHandledOrientation: Orientation = Orientation.LAND_LEFT
-        private set
-    private var surfaceRotation: Int =
-        Surface.ROTATION_90 // should be set by orientationChangedListener before it's used the first time
-
+    private val orientationEventListener by lazy { buildOrientationEventListener() }
+    private var lastHandledOrientation: Orientation = Orientation.LAND_LEFT
+    private var surfaceRotation: Int = Surface.ROTATION_90
     private var isInForeground = false
     private var startRecordingAction = false
     private var stopServiceAfterRecording = false
-
     private val vibrator by lazy { ContextCompat.getSystemService(this, Vibrator::class.java)!! }
-
-    // [НОВЫЙ КОД] Флаги для управления очередью и состоянием остановки
     @Volatile private var isStopping = false
     private var pendingStartIntent: Intent? = null
+    private var currentParams: RecordingParams? = null
 
+    @SuppressLint("MissingPermission")
     private fun vibrateOnStart() {
-        // TODO: Добавить проверку настройки из SharedPreferences
+        if (!sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_ON_START, true)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(50)
-        }
+        } else { @Suppress("DEPRECATION") vibrator.vibrate(50) }
     }
 
+    @SuppressLint("MissingPermission")
     private fun vibrateOnStop() {
-        if (!sharedPreferences.getBoolean("vibrate_on_stop", true)) return
-
-        val pattern = longArrayOf(0, 100, 80, 100) // чёткий "двойной импульс"
+        if (!sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_ON_STOP, true)) return
+        val pattern = longArrayOf(0, 100, 80, 100)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(pattern, -1)
-        }
+        } else { @Suppress("DEPRECATION") vibrator.vibrate(pattern, -1) }
     }
-
 
     private fun buildOrientationEventListener(): OrientationEventListener {
         return object : OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
-//                Log.d(TAG, "onOrientationChanged: $orientation")
                 val currentOrientation = when (orientation) {
-                    in 75..134 -> Orientation.LAND_RIGHT
-                    in 224..289 -> Orientation.LAND_LEFT
-                    else -> Orientation.PORTRAIT
+                    in 75..134 -> Orientation.LAND_RIGHT; in 224..289 -> Orientation.LAND_LEFT; else -> Orientation.PORTRAIT
                 }
                 surfaceRotation = when (currentOrientation) {
-                    Orientation.PORTRAIT -> Surface.ROTATION_0
-                    Orientation.LAND_RIGHT -> Surface.ROTATION_270
-                    Orientation.LAND_LEFT -> Surface.ROTATION_90
+                    Orientation.PORTRAIT -> Surface.ROTATION_0; Orientation.LAND_RIGHT -> Surface.ROTATION_270; Orientation.LAND_LEFT -> Surface.ROTATION_90
                 }
-                val orientationChanged = currentOrientation != lastHandledOrientation
-                val isRecording = state.value is State.Recording
-                val isReadyToRecord = state.value is State.ReadyToRecord
-                val useCasesInitialized =
-                    (state.value as? State.NotReadyToRecord)?.useCasesInitialized == true
-
-                if ((useCasesInitialized || isReadyToRecord) && !isRecording && orientationChanged) {
-                    Log.d(TAG, "Orientation changed, calling initRecording()")
+                if (state.value !is State.Recording && currentOrientation != lastHandledOrientation) {
                     lastHandledOrientation = currentOrientation
                     initRecording()
                 }
@@ -146,12 +112,8 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "onCreate()")
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         resolution = getVideoResolutionFromPrefs()
-        Log.d(TAG, "resolution from Preferences: $resolution")
-        cameraSettings = CameraSettings(sharedPreferences)
-
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         orientationEventListener.enable()
         (applicationContext as App).recordingService = this
@@ -159,640 +121,235 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "onDestroy()")
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         orientationEventListener.disable()
         (applicationContext as App).recordingService = null
     }
 
-    private var currentParams: RecordingParams? = null
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand() with action: ${intent?.action}")
-
-        if (intent?.action == null) {
-            return START_NOT_STICKY
+        if (intent?.action == null) return START_NOT_STICKY
+        if (intent.action == ApiConstants.ACTION_START) {
+            val keyManager: KeyManager = (application as App).globalServices.get()
+            if (runBlocking { keyManager.availableKeys.first() }.isEmpty()) {
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    action = ApiConstants.ACTION_CHECK_ENCRYPTION_KEY; addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+                return START_NOT_STICKY
+            }
         }
-
         when (intent.action) {
-            ApiConstants.ACTION_START -> {
-                handleStartCommand(intent)
-            }
-            ApiConstants.ACTION_STOP -> {
-                handleStopCommand()
-            }
-            ACTION_TOGGLE_RECORDING -> {
-                Log.d(TAG, "ACTION_TOGGLE_RECORDING received")
-                if (state.value is State.Recording) {
-                    handleStopCommand()
-                } else if (state.value is State.ReadyToRecord) {
-                    val defaultIntent = Intent().apply {
-                        action = ApiConstants.ACTION_START // [ИЗМЕНЕНО] Устанавливаем action для корректной обработки
-                        putExtra(ApiConstants.EXTRA_MODE, ApiConstants.MODE_DAY)
-                        putExtra(ApiConstants.EXTRA_RESOLUTION, "FHD")
-                    }
-                    handleStartCommand(defaultIntent)
-                }
-            }
+            ApiConstants.ACTION_START -> handleStartCommand(intent); ApiConstants.ACTION_STOP -> handleStopCommand()
         }
-
         return START_REDELIVER_INTENT
     }
 
     private fun handleStartCommand(intent: Intent) {
-        // [ИЗМЕНЕНО] Улучшенная логика защиты от спама и постановки в очередь
-        if (state.value is State.Recording) {
-            Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
-            return
-        }
-        if (isStopping) {
-            Log.w(TAG, "Start command received while stopping. Queuing command.")
-            pendingStartIntent = intent // Ставим в очередь
-            return
-        }
-
-        Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
-        foreground() // Показываем уведомление ПЕРЕД началом любых действий с камерой
-
+        if (state.value is State.Recording || isStopping) { if (isStopping) pendingStartIntent = intent; return }
+        foreground()
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
-
-        val useUltraWide: Boolean
-        val fps: Int
-        val oisEnabled: Boolean
-        val eisEnabled: Boolean
-        var lensFacing: Int
-
+        val useUltraWide: Boolean; val fps: Int; val oisEnabled: Boolean; val eisEnabled: Boolean
         when (mode) {
-            ApiConstants.MODE_DAY -> {
-                lensFacing = CameraSelector.LENS_FACING_BACK
-                useUltraWide = true
-                fps = 60
-                oisEnabled = false
-                eisEnabled = false
-            }
-            ApiConstants.MODE_NIGHT -> {
-                lensFacing = CameraSelector.LENS_FACING_BACK
-                useUltraWide = false
-                fps = 30
-                oisEnabled = true
-                eisEnabled = false
-            }
-            ApiConstants.MODE_FRONT -> {
-                lensFacing = CameraSelector.LENS_FACING_FRONT
-                useUltraWide = false
-                fps = 30
-                oisEnabled = false
-                eisEnabled = false
-            }
-            else -> {
-                lensFacing = CameraSelector.LENS_FACING_BACK
-                useUltraWide = false
-                fps = 30
-                oisEnabled = true
-                eisEnabled = true
-            }
+            ApiConstants.MODE_DAY -> { useUltraWide = true; fps = 60; oisEnabled = false; eisEnabled = false }
+            ApiConstants.MODE_NIGHT -> { useUltraWide = false; fps = 30; oisEnabled = true; eisEnabled = false }
+            ApiConstants.MODE_FRONT -> { useUltraWide = false; fps = 30; oisEnabled = false; eisEnabled = false }
+            else -> { useUltraWide = false; fps = 30; oisEnabled = true; eisEnabled = true }
         }
-
-        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
-
         val resolution = when (resStr.uppercase()) {
-            "HD" -> Size(1280, 720)
-            "FHD" -> Size(1920, 1080)
-            "2K" -> Size(2560, 1440)
-            "4K" -> Size(3840, 2160)
-            else -> Size(1920, 1080)
+            "HD" -> Size(1280, 720); "FHD" -> Size(1920, 1080); "2K" -> Size(2560, 1440); "4K" -> Size(3840, 2160); else -> Size(1920, 1080)
         }
-
-        currentParams = RecordingParams(
-            mode = mode,
-            resolution = resolution,
-            codec = codec,
-            fps = fps,
-            useUltraWide = useUltraWide,
-            isOisEnabled = oisEnabled,
-            isEisEnabled = eisEnabled
-        )
-
-        Log.d(TAG, "===> STEP 2: Parameters parsed successfully: $currentParams")
-
-        if (state.value is State.NotReadyToRecord || state.value is State.ReadyToRecord) {
-            Log.d(TAG, "===> STEP 3: Starting camera initialization process...")
-            val app = (applicationContext as App)
-            val keyManager: KeyManager = app.globalServices.get()
-            init(keyManager.selectedRecipients.value)
-            startRecordingAction = true
-
-            if (cameraProvider == null) {
-                Log.d(TAG, "CameraProvider is null. Calling initCamera().")
-                initCamera()
-            } else {
-                Log.d(TAG, "CameraProvider already exists. Calling initUseCases().")
-                initUseCases()
-            }
-        } else {
-            Log.e(TAG, "Could not start initialization, service in unexpected state: ${state.value}")
-        }
+        currentParams = RecordingParams(mode, resolution, codec, fps, useUltraWide, oisEnabled, eisEnabled)
+        startRecordingAction = true
+        if (cameraProvider == null) initCamera() else initUseCases()
     }
 
     @SuppressLint("NewApi")
     private fun isHevcSupported(width: Int, height: Int, frameRate: Int): Boolean {
-        val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
-
-        val encoderName = mediaCodecList.findEncoderForFormat(format)
-        if (encoderName == null) {
-            Log.w(TAG, "HEVC codec is NOT supported on this device.")
-            return false
-        }
-
-        Log.d(TAG, "HEVC codec found: $encoderName. Checking capabilities...")
-
         try {
-            val codecInfo = mediaCodecList.codecInfos.first { it.name == encoderName }
-            val capabilities = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
-            val videoCapabilities = capabilities.videoCapabilities
-
-            if (videoCapabilities.isSizeSupported(width, height) &&
-                videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())) {
-
-                Log.d(TAG, "SUCCESS: HEVC is supported for ${width}x${height} @ ${frameRate}fps.")
-                return true
-            } else {
-                Log.w(TAG, "FAILURE: HEVC codec exists, but does NOT support ${width}x${height} @ ${frameRate}fps.")
-                return false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to check HEVC capabilities", e)
-            return false
-        }
+            val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
+            val encoderName = mediaCodecList.findEncoderForFormat(format) ?: return false
+            val caps = mediaCodecList.codecInfos.first { it.name == encoderName }.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
+            return caps.videoCapabilities.isSizeSupported(width, height) && caps.videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())
+        } catch (e: Exception) { return false }
     }
-
 
     private fun handleStopCommand() {
-        // [ИЗМЕНЕНО] Улучшенная логика защиты от спама
-        if (state.value !is State.Recording) {
-            Log.w(TAG, "Stop command received, but not recording. Ignoring.")
-            return
-        }
-        if (isStopping) {
-            Log.w(TAG, "Stop command received, but service is already in stopping process. Ignoring.")
-            return
-        }
-
-        isStopping = true // [НОВЫЙ КОД] Устанавливаем флаг, что мы в процессе остановки
-        Log.d(TAG, "Stopping recording via command.")
-        stopServiceAfterRecording = true
-        stopRecording()
+        if (state.value !is State.Recording || isStopping) return
+        isStopping = true; stopServiceAfterRecording = true; stopRecording()
     }
 
-    fun init(recipients: Collection<KeyManager.X25519Recipient>) {
-        Log.d(TAG, "Service init() called.")
-        this.recipients = recipients
-    }
+
+
+
+    // --- ПУБЛИЧНЫЕ МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ---
 
     fun startRecording() {
-        val recordingManager = recordingManager ?: return
         if (state.value is State.ReadyToRecord) {
-            recordingManager.recordButtonClicked()
+            recordingManager?.recordButtonClicked()
             updateRecordingStateHandler.post(updateRecordingStateRunnable)
-            _state.value = State.Recording(
-                (state.value as State.ReadyToRecord).resolution,
-                (state.value as State.ReadyToRecord).surfaceRotation,
-                Duration.ZERO,
-                (state.value as State.ReadyToRecord).selectedCamera,
-                (state.value as State.ReadyToRecord).flashOn
-            )
+            val currentState = state.value as State.ReadyToRecord
+            _state.value = State.Recording(currentState.resolution, currentState.surfaceRotation, Duration.ZERO, currentState.selectedCamera, currentState.flashOn)
         }
     }
 
     fun stopRecording() {
-        val recordingManager = recordingManager ?: return
         if (state.value is State.Recording) {
-            recordingManager.recordButtonClicked()
+            recordingManager?.recordButtonClicked()
             updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
-
-            _state.value = State.ReadyToRecord(
-                (state.value as State.Recording).resolution,
-                (state.value as State.Recording).surfaceRotation,
-                (state.value as State.Recording).selectedCamera,
-                (state.value as State.Recording).flashOn
-            )
+            val currentState = state.value as State.Recording
+            _state.value = State.ReadyToRecord(currentState.resolution, currentState.surfaceRotation, currentState.selectedCamera, currentState.flashOn)
         }
     }
 
     fun toggleFlash() {
-        val currentState = _state.value
-        val newFlashState = !currentState.flashOn
-        val cameraControl = camera?.cameraControl
-        if (cameraControl == null) {
-            debugToast("cameraControll is null in toggleFlash")
-            return
-        }
-        cameraControl.enableTorch(newFlashState)
-        _state.value = when (currentState) {
-            is State.ReadyToRecord -> {
-                currentState.copy(flashOn = newFlashState)
-            }
-            is State.Recording -> {
-                currentState.copy(flashOn = newFlashState)
-            }
-            is State.NotReadyToRecord -> {
-                currentState.copy(flashOn = newFlashState)
-            }
+        val newFlashState = !state.value.flashOn
+        camera?.cameraControl?.enableTorch(newFlashState)
+        _state.value = when (val currentState = _state.value) {
+            is State.ReadyToRecord -> currentState.copy(flashOn = newFlashState)
+            is State.Recording -> currentState.copy(flashOn = newFlashState)
+            is State.NotReadyToRecord -> currentState.copy(flashOn = newFlashState)
         }
     }
 
     fun toggleCamera() {
-        val currentState = _state.value
-        val newSelectedCamera = currentState.selectedCamera.other()
-        val newState = when (currentState) {
-            is State.Recording -> return
-            is State.ReadyToRecord -> {
-                currentState.copy(selectedCamera = newSelectedCamera)
-            }
-            is State.NotReadyToRecord -> {
-                currentState.copy(selectedCamera = newSelectedCamera)
-            }
-        }
-        cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(
-                when (newSelectedCamera) {
-                    SelectedCamera.BACK -> CameraSelector.LENS_FACING_BACK
-                    SelectedCamera.FRONT -> CameraSelector.LENS_FACING_FRONT
-                }
-            )
-            .build()
-        _state.value = State.NotReadyToRecord(false, newSelectedCamera, currentState.flashOn)
-        when (cameraProvider) {
-            null -> initCamera()
-            else -> initUseCases()
-        }
+        if (state.value is State.Recording) return
+        val newSelectedCamera = state.value.selectedCamera.other()
+        _state.value = State.NotReadyToRecord(false, newSelectedCamera, state.value.flashOn)
+        if (cameraProvider == null) initCamera() else initUseCases()
     }
 
-    fun foreground() {
-        Log.d(TAG, "foreground()")
+    fun bindUseCase(useCase: UseCase) {
+        cameraProvider?.bindToLifecycle(this, cameraSelector, useCase)
+    }
 
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "Attempted to start foreground service without FOREGROUND_SERVICE permission.")
-            return
-        }
+    fun unbindUseCase(useCase: UseCase) {
+        cameraProvider?.unbind(useCase)
+    }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            startForeground(
-                notificationId,
-                notificationBuilder.build(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
+    fun scaleZoomRatio(scaleFactor: Float) {
+        val currentZoomRatio = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: return
+        camera?.cameraControl?.setZoomRatio(currentZoomRatio * scaleFactor)
+    }
+
+    fun startFocusAndMetering(action: FocusMeteringAction) {
+        camera?.cameraControl?.startFocusAndMetering(action)
+    }
+
+    // --- ВНУТРЕННИЕ МЕТОДЫ СЕРВИСА ---
+
+    private fun foreground() {
+        if (isInForeground) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(notificationId, notificationBuilder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(notificationId, notificationBuilder.build())
         }
-        NotificationManagerCompat.from(this).notify(notificationId, notificationBuilder.build())
         isInForeground = true
     }
 
-    fun background() {
-        Log.d(TAG, "background()")
-        stopForeground(true)
-        isInForeground = false
-    }
-
     private fun initCamera() {
-        Log.d(TAG, "===> STEP 4: initCamera CALLED")
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener(Runnable {
+        ProcessCameraProvider.getInstance(this).addListener({
             try {
-                val cameraProvider = cameraProviderFuture.get()
-                this.cameraProvider = cameraProvider
-                Log.d(TAG, "===> STEP 5: CameraProvider received successfully. Initializing UseCases...")
+                cameraProvider = ProcessCameraProvider.getInstance(this).get()
                 initUseCases()
-            } catch (e: Exception) {
-                Log.e(TAG, "===> FATAL: Failed to get CameraProvider", e)
-            }
+            } catch (e: Exception) { Log.e(TAG, "Failed to get CameraProvider", e) }
         }, ContextCompat.getMainExecutor(this))
     }
 
-    @SuppressLint("RestrictedApi", "UnsafeOptInUsageError")
-    @OptIn(ExperimentalCamera2Interop::class)
+    @SuppressLint("RestrictedApi")
     fun initUseCases() {
-        Log.d(TAG, "===> STEP 6: initUseCases CALLED")
-        val cameraProvider = cameraProvider ?: return
-        cameraProvider.unbindAll()
-
-        val params = currentParams
-        if (params == null) {
-            Log.e(TAG, "===> FATAL: initUseCases called but no RecordingParams were set. Aborting.")
-            return
-        }
-
-        val requestedIdKey = when (params.mode) {
+        val localCameraProvider = cameraProvider ?: return
+        localCameraProvider.unbindAll()
+        val params = currentParams ?: return
+        val customCameraId = sharedPreferences.getString(when (params.mode) {
             ApiConstants.MODE_DAY -> SettingsFragment.PREF_CAMERA_ID_DAY
             ApiConstants.MODE_NIGHT -> SettingsFragment.PREF_CAMERA_ID_NIGHT
             ApiConstants.MODE_FRONT -> SettingsFragment.PREF_CAMERA_ID_FRONT
             else -> null
-        }
-
-        val customCameraId = requestedIdKey?.let { sharedPreferences.getString(it, null)?.trim() }
-
+        }, null)?.trim()
         val cameraSelectorBuilder = CameraSelector.Builder()
-
         if (!customCameraId.isNullOrBlank()) {
-            Log.d(TAG, "Manual camera ID specified: '$customCameraId'. Attempting to select.")
-            cameraSelectorBuilder.addCameraFilter { cameraInfoList ->
-                val matchingCamera = cameraInfoList.firstOrNull { cameraInfo ->
-                    Camera2CameraInfo.from(cameraInfo).cameraId == customCameraId
-                }
-                if (matchingCamera != null) {
-                    Log.d(TAG, "Successfully found camera with ID '$customCameraId'.")
-                    listOf(matchingCamera)
-                } else {
-                    Log.w(TAG, "Camera with ID '$customCameraId' NOT FOUND. Falling back to default logic.")
-                    cameraInfoList
-                }
-            }
+            cameraSelectorBuilder.addCameraFilter { it.filter { Camera2CameraInfo.from(it).cameraId == customCameraId } }
+        } else if (params.useUltraWide) {
+            cameraSelectorBuilder.addCameraFilter { it.sortedBy { c -> try { Camera2CameraInfo.extractCameraCharacteristics(c)[CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS]?.minOrNull() ?: Float.MAX_VALUE } catch (e: Exception) { Float.MAX_VALUE } } }
         } else {
-            Log.d(TAG, "No manual camera ID. Using auto-detection logic.")
-            if (params.useUltraWide) {
-                Log.d(TAG, "Auto-detection: searching for wide-angle camera.")
-                cameraSelectorBuilder.addCameraFilter { cameraInfoList ->
-                    val widestCamera = cameraInfoList.minByOrNull { cameraInfo ->
-                        try {
-                            val characteristics = Camera2CameraInfo.extractCameraCharacteristics(cameraInfo)
-                            val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-                            focalLengths?.minOrNull() ?: Float.MAX_VALUE
-                        } catch (e: Exception) { Float.MAX_VALUE }
-                    }
-                    if (widestCamera != null) {
-                        val cameraId = Camera2CameraInfo.from(widestCamera).cameraId
-                        Log.d(TAG, "Auto-detection: selected camera with smallest focal length: $cameraId")
-                        listOf(widestCamera)
-                    } else {
-                        cameraInfoList
-                    }
-                }
-            } else {
-                val lensFacing = if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
-                Log.d(TAG, "Auto-detection: selecting camera with LENS_FACING = $lensFacing")
-                cameraSelectorBuilder.requireLensFacing(lensFacing)
-            }
+            cameraSelectorBuilder.requireLensFacing(if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK)
         }
-
-        val finalCameraSelector = cameraSelectorBuilder.build()
-
-        var finalCodec = MediaFormat.MIMETYPE_VIDEO_AVC
-        if (params.codec == ApiConstants.CODEC_HEVC) {
-            Log.d(TAG, "HEVC codec requested. Attempting to use it.")
-            finalCodec = MediaFormat.MIMETYPE_VIDEO_HEVC
-        }
-
-        fun createVideoCaptureBuilder(): VideoStreamCapture.Builder {
-            return VideoStreamCapture.Builder()
-                .setVideoFrameRate(params.fps)
-                .setCameraSelector(finalCameraSelector)
-                .setTargetResolution(params.resolution)
-                .setBitRate(cameraSettings.bitrate)
-                .setTargetRotation(Surface.ROTATION_90)
-                .setIFrameInterval(1)
-                .setVideoCodec(finalCodec)
-        }
-
-        val builderWithSettings = createVideoCaptureBuilder()
-        val extender = Camera2Interop.Extender(builderWithSettings)
-
-        if (params.fps >= 50) {
-            Log.d(TAG, "Applying high-speed FPS range via Camera2Interop")
-            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(params.fps, params.fps))
-        }
-
-        Log.d(TAG, "Applying stabilization settings: OIS=${params.isOisEnabled}, EIS=${params.isEisEnabled}")
-        extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON else CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF)
-        extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
-
+        cameraSelector = cameraSelectorBuilder.build()
+        val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && isHevcSupported(params.resolution.width, params.resolution.height, params.fps)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
+        val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
+            .setBitRate(10_000_000).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
+        val extender = Camera2Interop.Extender(builder)
+        if (params.fps >= 50) extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(params.fps, params.fps))
+        extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
         try {
-            Log.d(TAG, "Attempting to bind with custom settings...")
-            videoCapture = builderWithSettings.build()
-            camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
-            Log.d(TAG, "===> STEP 7: bindToLifecycle successful WITH custom settings.")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Bind with custom settings FAILED. Falling back to default.", e)
-            try {
-                cameraProvider.unbindAll()
-                val fallbackBuilder = createVideoCaptureBuilder()
-                videoCapture = fallbackBuilder.build()
-                camera = cameraProvider.bindToLifecycle(this, finalCameraSelector, videoCapture!!)
-                Log.d(TAG, "===> STEP 7 (Fallback): bindToLifecycle successful WITHOUT custom settings.")
-            } catch (e2: Exception) {
-                Log.e(TAG, "===> FATAL: Fallback bind also FAILED. Cannot initialize camera.", e2)
-                return
-            }
-        }
-
-        camera?.cameraControl?.enableTorch(_state.value.flashOn)
+            videoCapture = builder.build()
+            camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
+        } catch (e: Exception) { Log.e(TAG, "Bind to lifecycle failed", e); return }
+        camera?.cameraControl?.enableTorch(state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
         initRecording()
     }
 
     @SuppressLint("RestrictedApi")
     private fun initRecording() {
-        Log.d(TAG, "===> STEP 8: initRecording CALLED")
-        _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
-        val outputLocation =
-            sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
-        if (recipients.isEmpty()) {
-            debugToast(getString(R.string.no_key_selected))
-            return
-        }
-        val actualRes = videoCapture?.attachedSurfaceResolution
-        if (actualRes == null) {
-            debugToast("actualRes is null in initRecording")
-            return
-        }
-
-        val width = actualRes.width
-        val height = actualRes.height
-
-        if (16 * height != 9 * width) {
-            debugToast("Actual recording resolution: ${width}x${height}. This is probably a bug.")
-        } else if (Size(width, height) != resolution) {
-            debugToast("Actual recording resolution: ${width}x${height}.")
-        }
-        val orientation = lastHandledOrientation
-
-        Log.d(TAG, "Orientation: $orientation")
-        val videoInfo = VideoInfo(
-            bitrate = cameraSettings.bitrate,
-            height = height,
-            width = width,
-            rotation = when (orientation) {
-                Orientation.PORTRAIT -> 90
-                Orientation.LAND_LEFT -> 0
-                Orientation.LAND_RIGHT -> 180
-            }
-        )
-        Log.d(TAG, "VideoInfo: $videoInfo")
-        val videoCapture = checkNotNull(videoCapture)
-        val audioInfo = AudioInfo(
-            bitrate = videoCapture.audioBitRate,
-            sampleRate = videoCapture.audioSampleRate,
-            channelCount = videoCapture.audioChannelCount
-        )
-        outputFileManager = OutputFileManager(
-            outputLocation = Uri.parse(outputLocation),
-            contentResolver = contentResolver,
-            context = this,
-            sharedPreferences = sharedPreferences,
-            recipients = recipients
-        )
-
-        recordingManager = RecordingManager(
-            cameraSettings,
-            videoCapture,
-            videoInfo,
-            audioInfo,
-            ContextCompat.getMainExecutor(this),
-            lifecycleScope,
-            outputFileManager!!,
+        val outputLocationStr = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
+        val keyManager: KeyManager = (application as App).globalServices.get()
+        val recipients = runBlocking { keyManager.selectedRecipients.first() }
+        if (outputLocationStr == null || recipients.isEmpty() || videoCapture == null) return
+        val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
+        val videoInfo = VideoInfo(actualRes.width, actualRes.height, when (lastHandledOrientation) {
+            Orientation.PORTRAIT -> 90; Orientation.LAND_LEFT -> 0; Orientation.LAND_RIGHT -> 180
+        }, 10_000_000)
+        val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
+        val outputFileManager = OutputFileManager(outputLocationStr.toUri(), recipients, contentResolver, sharedPreferences, this)
+        recordingManager = RecordingManager(videoCapture!!, videoInfo, audioInfo, ContextCompat.getMainExecutor(this), lifecycleScope, outputFileManager,
             recordingStoppedCallback = {
-                // [ИЗМЕНЕНО] Центральная точка управления после остановки
-                Log.d(TAG, "RecordingManager: recordingStoppedCallback triggered.")
-                isStopping = false // Сбрасываем флаг
-
+                isStopping = false
                 if (stopServiceAfterRecording) {
-                    stopServiceAfterRecording = false // Сбрасываем флаг, чтобы не остановить сервис случайно в будущем
-                    val hasPendingStart = pendingStartIntent != null
-                    // Если нет задачи на новый старт, то останавливаем сервис
-                    if (!hasPendingStart) {
-                        Log.d(TAG, "Callback: No pending start. Stopping foreground and self.")
-                        background()
+                    stopServiceAfterRecording = false
+                    if (pendingStartIntent == null) {
+                        // [ИСПРАВЛЕНО] Совместимый вызов stopForeground
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                        isInForeground = false
                         stopSelf()
                     }
                 }
-
-                // [НОВЫЙ КОД] Проверяем, есть ли в очереди команда на запуск
-                pendingStartIntent?.let {
-                    Log.d(TAG, "Callback: Found pending start intent. Handling it now.")
-                    val intentToStart = it
-                    pendingStartIntent = null // Очищаем очередь
-                    handleStartCommand(intentToStart)
-                }
+                pendingStartIntent?.let { val intent = it; pendingStartIntent = null; handleStartCommand(intent) }
             },
             onRecordingStarted = { vibrateOnStart() },
             onRecordingStopped = { vibrateOnStop() }
-
         )
-        lifecycleScope.launchWhenStarted {
-            Log.d(TAG, "===> STEP 9: RecordingManager setup starting...")
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) {
             recordingManager!!.setUp()
-            Log.d(TAG, "===> STEP 10: RecordingManager setup complete. State is being set to ReadyToRecord.")
-            when (val currentState = _state.value) {
-                is State.NotReadyToRecord -> {
-                    _state.value = State.ReadyToRecord(
-                        resolution,
-                        surfaceRotation,
-                        currentState.selectedCamera,
-                        currentState.flashOn
-                    )
-                    if (startRecordingAction) {
-                        startRecordingAction = false
-                        Log.d(TAG, "===> STEP 11: startRecordingAction is true. Starting recording now...")
-                        delay(400)
-                        startRecording()
-                    }
-                }
-                else -> {
-                    Log.w(TAG, "onReadyToRecord called but state is $currentState!")
-                }
+            if (state.value is State.NotReadyToRecord) {
+                val currentState = state.value as State.NotReadyToRecord
+                _state.value = State.ReadyToRecord(resolution, surfaceRotation, currentState.selectedCamera, currentState.flashOn)
+                if (startRecordingAction) { startRecordingAction = false; delay(400); startRecording() }
             }
-        }
+        }}
     }
-
-    fun scaleZoomRatio(scaleFactor: Float) {
-        val currentZoomRatio: Float? = camera?.cameraInfo?.zoomState?.value?.zoomRatio
-        if (currentZoomRatio == null) {
-            when {
-                camera == null -> debugToast("camera is null in scaleZoomRatio")
-                camera?.cameraInfo == null -> debugToast("cameraInfo is null in scaleZoomRatio")
-                camera?.cameraInfo?.zoomState == null -> debugToast("zoomState is null in scaleZoomRatio")
-                else -> debugToast("zoomRatio is null in scaleZoomRatio")
-            }
-            return
-        }
-        val cameraControl = camera?.cameraControl
-        if (cameraControl == null) {
-            debugToast("cameraControl is null in scaleZoomRatio")
-            return
-        }
-        cameraControl.setZoomRatio(currentZoomRatio * scaleFactor)
-    }
-
-    fun startFocusAndMetering(action: FocusMeteringAction) {
-        val cameraControl = camera?.cameraControl
-        if (cameraControl == null) {
-            when {
-                camera == null -> debugToast("camera is null in startFocusAndMetering")
-                else -> debugToast("cameraControl is null in startFocusAndMetering")
-            }
-
-            return
-        }
-        cameraControl.startFocusAndMetering(action)
-    }
-
-    fun bindUseCase(useCase: UseCase) {
-        val cameraProvider = cameraProvider
-        if (cameraProvider == null) {
-            debugToast("cameraProvider is null in bindUseCase")
-            return
-        }
-        cameraProvider.bindToLifecycle(this, cameraSelector, useCase)
-    }
-
-    fun unbindUseCase(useCase: UseCase) {
-        val cameraProvider = cameraProvider
-        if (cameraProvider == null) {
-            debugToast("cameraProvider is null in unbindUseCase")
-            return
-        }
-        cameraProvider.unbind(useCase)
-    }
-
 
     private val updateRecordingStateHandler = Handler(Looper.getMainLooper())
     private val updateRecordingStateRunnable: Runnable = object : Runnable {
         override fun run() {
-            val recordingManager = recordingManager
-            if (recordingManager == null) {
-                // [ИЗМЕНЕНО] Не крашимся, а просто прекращаем обновление
-                // debugToast("recordingManagerNull in updateRecordingStateRunnable")
-                return
-            }
-            val currentState = _state.value
-            if (currentState is State.Recording) {
-                _state.value = currentState.copy(recordingTime = recordingManager.recordingTime)
-            }
-
+            val recManager = recordingManager ?: return
+            if (state.value is State.Recording) { _state.value = (state.value as State.Recording).copy(recordingTime = recManager.recordingTime) }
             if (isInForeground) {
-                val d = recordingManager.recordingTime
-                val text = if (d.toHours() > 0) {
-                    String.format(
-                        "%02d:%02d:%02d",
-                        d.toHours(),
-                        d.toMinutes() % 60,
-                        d.seconds % 60
-                    )
-                } else {
-                    String.format("%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
-                }
-                val n = (notificationBuilder as NotificationCompat.Builder)
-                    .setContentText(getString(R.string.notification_text, text))
-                    .build()
-
+                val d = recManager.recordingTime
+                val text = if (d.toHours() > 0) String.format(Locale.US, "%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
+                else String.format(Locale.US, "%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
+                // [ИСПРАВЛЕНО] Добавлена проверка разрешений
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(this@RecordingService, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    ContextCompat.checkSelfPermission(this@RecordingService, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    // Не можем обновить уведомление, но сервис продолжит работать
                 } else {
-                    notificationManager.notify(notificationId, n)
+                    notificationManager.notify(notificationId, notificationBuilder.setContentText(getString(R.string.notification_text, text)).build())
                 }
             }
             updateRecordingStateHandler.postDelayed(this, 200)
@@ -800,67 +357,24 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun getVideoResolutionFromPrefs(): Size {
-        val r = sharedPreferences.getString(
-            SettingsFragment.PREF_VIDEO_RESOLUTION,
-            SettingsFragment.DEFAULT_RESOLUTION
-        ) ?: SettingsFragment.DEFAULT_RESOLUTION
-        val s = r.split("x")
+        val s = (sharedPreferences.getString(SettingsFragment.PREF_VIDEO_RESOLUTION, SettingsFragment.DEFAULT_RESOLUTION) ?: SettingsFragment.DEFAULT_RESOLUTION).split("x")
         return Size(s[0].toInt(), s[1].toInt())
     }
 
-    override val lifecycle: Lifecycle
-        get() = lifecycleRegistry
-
-    override fun onBind(intent: Intent?): IBinder {
-        isBound = true
-        Log.d(TAG, "stopServiceAfterRecording = false")
-        stopServiceAfterRecording = false
-        return binder
-    }
-
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override fun onBind(intent: Intent?): IBinder { isBound = true; stopServiceAfterRecording = false; return binder }
     override fun onUnbind(intent: Intent?): Boolean {
         isBound = false
-        // [ИЗМЕНЕНО] Если сервис не записывает видео, когда от него отключается UI, он должен остановиться
-        if (state.value !is State.Recording) {
-            Log.d(TAG, "onUnbind: not recording, stopping self.")
-            stopSelf()
-        }
+        if (state.value !is State.Recording) stopSelf()
         return super.onUnbind(intent)
     }
 
-    private fun debugToast(msg: String) =
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-
-    companion object {
-        const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording"
-    }
-
-    inner class RecordingServiceBinder : Binder() {
-        val service: RecordingService
-            get() = this@RecordingService
-    }
-
+    private fun debugToast(msg: String) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+    companion object { const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording" }
+    inner class RecordingServiceBinder : Binder() { val service: RecordingService get() = this@RecordingService }
     sealed class State(open val selectedCamera: SelectedCamera, open val flashOn: Boolean) {
-        data class Recording(
-            val resolution: Size,
-            val surfaceRotation: Int,
-            val recordingTime: Duration,
-            override val selectedCamera: SelectedCamera,
-            override val flashOn: Boolean
-        ) : State(selectedCamera, flashOn)
-
-        data class ReadyToRecord(
-            val resolution: Size,
-            val surfaceRotation: Int,
-            override val selectedCamera: SelectedCamera,
-            override val flashOn: Boolean
-        ) : State(selectedCamera, flashOn)
-
-        data class NotReadyToRecord(
-            val useCasesInitialized: Boolean,
-            override val selectedCamera: SelectedCamera,
-            override val flashOn: Boolean
-        ) : State(selectedCamera, flashOn)
+        data class Recording(val resolution: Size, val surfaceRotation: Int, val recordingTime: Duration, override val selectedCamera: SelectedCamera, override val flashOn: Boolean) : State(selectedCamera, flashOn)
+        data class ReadyToRecord(val resolution: Size, val surfaceRotation: Int, override val selectedCamera: SelectedCamera, override val flashOn: Boolean) : State(selectedCamera, flashOn)
+        data class NotReadyToRecord(val useCasesInitialized: Boolean, override val selectedCamera: SelectedCamera, override val flashOn: Boolean) : State(selectedCamera, flashOn)
     }
-
 }

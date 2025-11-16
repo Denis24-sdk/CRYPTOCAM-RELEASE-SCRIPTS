@@ -11,20 +11,17 @@ import android.view.KeyEvent
 import android.view.Window
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.ExperimentalCameraFilter // [ИСПРАВЛЕНО] Добавлен импорт
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.ActivityMainBinding
 import com.tnibler.cryptocam.keys.KeyManager
 import com.tnibler.cryptocam.keys.keyList.KeysKey
 import com.tnibler.cryptocam.keys.parseImportUri
-import com.tnibler.cryptocam.onboarding.InfoBackgroundRecordingKey
 import com.tnibler.cryptocam.onboarding.PickKeyKey
 import com.tnibler.cryptocam.onboarding.PickOutputDirKey
-import com.tnibler.cryptocam.onboarding.WebsiteInfoKey
-import com.tnibler.cryptocam.photo.PhotoKey
-import com.tnibler.cryptocam.photo.PhotoViewModel
 import com.tnibler.cryptocam.preference.SettingsFragment
-import com.tnibler.cryptocam.video.CameraDebugKey
+import com.tnibler.cryptocam.preference.SettingsKey
 import com.tnibler.cryptocam.video.VideoKey
 import com.zhuinden.simplestack.SimpleStateChanger
 import com.zhuinden.simplestack.StateChange
@@ -33,13 +30,13 @@ import com.zhuinden.simplestackextensions.fragments.DefaultFragmentKey
 import com.zhuinden.simplestackextensions.fragments.DefaultFragmentStateChanger
 import com.zhuinden.simplestackextensions.navigatorktx.backstack
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
-import com.zhuinden.simplestackextensions.servicesktx.canFind
 import com.zhuinden.simplestackextensions.servicesktx.get
-import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import com.zhuinden.simplestackextensions.servicesktx.lookup
 
 @SuppressLint("RestrictedApi")
+@ExperimentalCameraFilter // [ИСПРАВЛЕНО] Добавлена аннотация для всего класса
 class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     private val TAG = javaClass.simpleName
     private lateinit var binding: ActivityMainBinding
@@ -51,7 +48,6 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate")
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -63,40 +59,38 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
-
         fragmentStateChanger = DefaultFragmentStateChanger(supportFragmentManager, R.id.container)
         handleIntent(intent)
     }
 
-    private fun regularStart() {
+    // [ИСПРАВЛЕНО] Метод упрощен, убрана вся логика онбординга
+    private fun regularStart(initialKeyOverride: DefaultFragmentKey? = null) {
         val keys = runBlocking { keyManager.availableKeys.first() }
-        val shouldShowTutorialInfo =
-            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_TUTORIAL_INFO, false)
-        val shouldShowBackgroundRecordingInfo =
-            !sharedPreferences.getBoolean(SettingsFragment.SHOWED_BACKGROUND_RECORDING_INFO, false)
-        val rememberLastShootingMode = sharedPreferences.getBoolean(SettingsFragment.PREF_REMEMBER_SHOOTING_MODE, false)
-        val lastShootingMode = sharedPreferences.getString(SettingsFragment.LAST_SHOOTING_MODE, "video")
-        val initialKey = when {
-            shouldShowTutorialInfo -> WebsiteInfoKey()
-            shouldShowBackgroundRecordingInfo -> InfoBackgroundRecordingKey()
+
+        val initialKey = initialKeyOverride ?: when {
             keys.isEmpty() -> PickKeyKey()
             !outputDirExists() -> PickOutputDirKey()
-            rememberLastShootingMode && lastShootingMode == "photo" -> PhotoKey()
-            else -> VideoKey()
+            // Если все настроено, по умолчанию можно показать экран ключей или настроек,
+            // но так как UI не должен появляться, этот путь почти не будет использоваться.
+            else -> KeysKey()
         }
+
         val initialHistory = listOf(initialKey)
-        Navigator.configure()
-            .setGlobalServices((application as App).globalServices)
-            .setScopedServices(DefaultServiceProvider())
-            .setStateChanger(SimpleStateChanger(this@MainActivity))
-            .install(this@MainActivity, findViewById(R.id.container), initialHistory)
-        isNavigationSetUp = true
+
+        if (!isNavigationSetUp) {
+            Navigator.configure()
+                .setGlobalServices((application as App).globalServices)
+                .setScopedServices(DefaultServiceProvider())
+                .setStateChanger(SimpleStateChanger(this@MainActivity))
+                .install(this@MainActivity, findViewById(R.id.container), initialHistory)
+            isNavigationSetUp = true
+        } else {
+            backstack.setHistory(initialHistory, StateChange.REPLACE)
+        }
     }
 
     override fun onNavigationEvent(stateChange: StateChange) {
@@ -118,44 +112,41 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     private fun handleIntent(intent: Intent?) {
         val action = intent?.action
         val data = intent?.data
-        Log.d(TAG, "action $action, data $data")
+        Log.d(TAG, "handleIntent() with action: $action, data: $data")
 
-        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        // Проверяем, пришла ли наша новая команда
-        if (action == "com.tnibler.cryptocam.SHOW_DEBUG_SCREEN") {
-            Log.d(TAG, "Debug screen action received")
-            // Создаем историю навигации с одним нашим экраном
-            val initialHistory = listOf(CameraDebugKey())
-            if (!isNavigationSetUp) {
-                Navigator.configure()
-                    .setGlobalServices((application as App).globalServices)
-                    .setScopedServices(DefaultServiceProvider())
-                    .setStateChanger(SimpleStateChanger(this@MainActivity))
-                    .install(this@MainActivity, findViewById(R.id.container), initialHistory)
-                isNavigationSetUp = true
-            } else {
-                // Если приложение уже было запущено, просто переходим на экран
-                backstack.setHistory(initialHistory, StateChange.REPLACE)
+        when (action) {
+            ApiConstants.ACTION_OPEN_SETTINGS -> {
+                Log.d(TAG, "Settings screen action received")
+                regularStart(SettingsKey())
+                return
             }
-            return // Важно выйти из функции здесь
+            ApiConstants.ACTION_OPEN_KEYS -> {
+                Log.d(TAG, "Keys screen action received")
+                regularStart(KeysKey())
+                return
+            }
+            ApiConstants.ACTION_CHECK_ENCRYPTION_KEY -> {
+                Log.d(TAG, "Check encryption key action received")
+                val keys = runBlocking { keyManager.availableKeys.first() }
+                if (keys.isEmpty()) {
+                    regularStart(PickKeyKey())
+                } else {
+                    finish()
+                }
+                return
+            }
         }
 
         if (data != null && action == Intent.ACTION_VIEW && data.scheme == "cryptocam" && data.host == "import_key") {
             Log.d(TAG, "import key deep link")
-            // import key from deep link qr code
             val recipient = parseImportUri(data.toString())
             if (recipient == null) {
                 Log.d(TAG, "failed to parse import key uri")
                 regularStart()
                 return
             }
-            val firstKey = if (outputDirExists()) {
-                VideoKey()
-            } else {
-                PickOutputDirKey()
-            }
+            val firstKey = if (outputDirExists()) VideoKey() else PickOutputDirKey()
             val initialHistory = listOf(firstKey, KeysKey(recipient))
-            Log.d(TAG, "initial history: $initialHistory")
             if (!isNavigationSetUp) {
                 Navigator.configure()
                     .setGlobalServices((application as App).globalServices)
@@ -167,15 +158,16 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 backstack.setHistory(initialHistory, StateChange.REPLACE)
             }
         } else {
-            regularStart()
+            // Если это не специальная команда, закрываем Activity, чтобы не было UI
+            if (isTaskRoot) {
+                finish()
+            }
         }
     }
 
     override fun onPause() {
         super.onPause()
-        if (backstack.canFind<PhotoViewModel>()) {
-            backstack.lookup<PhotoViewModel>().onActivityPaused()
-        }
+        // Логика для PhotoViewModel больше не релевантна в этом контексте, но не вызывает ошибки
     }
 
     override fun onResume() {
@@ -183,11 +175,10 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         Log.d(TAG, "onResume()")
     }
 
+    // Этот метод больше не используется для основной логики, но оставляем его, т.к. он не мешает
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            Log.d(TAG, "Volume key pressed")
             if (backstack.canFindService(VolumeKeyPressListener::class.java.name)) {
-                Log.d(TAG, "Can find VolumeKeyPressListener")
                 val listener: VolumeKeyPressListener = backstack.lookup()
                 listener.onVolumeKeyDown()
                 return true
@@ -201,37 +192,26 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         when (currentDestination) {
             is PickKeyKey -> {
                 if (!outputDirExists()) {
-                    // remove PickKey from history
-                    val history = backstack.getHistory<DefaultFragmentKey>()
-                    backstack.setHistory(history.drop(1) + PickOutputDirKey(), StateChange.FORWARD)
+                    backstack.goTo(PickOutputDirKey())
                 } else {
-                    backstack.setHistory(
-                        listOf<DefaultFragmentKey>(VideoKey()),
-                        StateChange.FORWARD
-                    )
+                    // После выбора ключа просто закрываем Activity
+                    finish()
                 }
             }
             is PickOutputDirKey -> {
-                backstack.setHistory(listOf<DefaultFragmentKey>(VideoKey()), StateChange.FORWARD)
-            }
-            is InfoBackgroundRecordingKey -> {
-                when {
-                    keyManager.availableKeys.value.isEmpty() -> backstack.goTo(PickKeyKey())
-                    !outputDirExists() -> backstack.goTo(PickOutputDirKey())
-                    else -> backstack.setHistory(listOf(VideoKey()), StateChange.FORWARD)
-                }
+                // После выбора папки закрываем Activity
+                finish()
             }
         }
     }
 
     private fun outputDirExists(): Boolean {
-        try {
-            val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
-                ?: return false
+        return try {
+            val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null) ?: return false
             val df = DocumentFile.fromTreeUri(this, Uri.parse(savedUri)) ?: return false
-            return df.exists()
+            df.exists()
         } catch (e: Exception) {
-            return false
+            false
         }
     }
 

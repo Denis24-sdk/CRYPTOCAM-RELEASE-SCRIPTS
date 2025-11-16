@@ -5,7 +5,6 @@ import android.os.HandlerThread
 import android.util.Log
 import androidx.camera.core.EncodedBufferHandler
 import androidx.camera.core.VideoStreamCapture
-import com.tnibler.cryptocam.CameraSettings
 import com.tnibler.cryptocam.OutputFileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -13,7 +12,6 @@ import java.time.Duration
 import java.util.concurrent.Executor
 
 class RecordingManager(
-    val cameraSettings: CameraSettings,
     private val videoCapture: VideoStreamCapture,
     private val videoInfo: VideoInfo,
     private val audioInfo: AudioInfo,
@@ -21,9 +19,8 @@ class RecordingManager(
     private val coroutineScope: CoroutineScope,
     private val outputFileManager: OutputFileManager,
     private val recordingStoppedCallback: (() -> Unit),
-
-    private val onRecordingStarted: () -> Unit = {},      // Когда запись РЕАЛЬНО началась
-    private val onRecordingStopped: () -> Unit = {},      // Когда запись РЕАЛЬНО остановилась
+    private val onRecordingStarted: () -> Unit = {},
+    private val onRecordingStopped: () -> Unit = {},
 ) {
     private val TAG = javaClass.simpleName
     var state: State = State.NOT_RECORDING
@@ -37,15 +34,11 @@ class RecordingManager(
         Log.d(TAG, "setting up muxer")
         videoCapture.setEncodedBufferHandler(object : EncodedBufferHandler {
             override fun audioBufferReady(data: ByteArray, presentationTimeUs: Long) {
-                encryptingHandler.post {
-                    videoFile?.writeAudioBuffer(data, presentationTimeUs)
-                }
+                encryptingHandler.post { videoFile?.writeAudioBuffer(data, presentationTimeUs) }
             }
 
             override fun videoBufferReady(data: ByteArray, presentationTimeUs: Long) {
-                encryptingHandler.post {
-                    videoFile?.writeVideoBuffer(data, presentationTimeUs)
-                }
+                encryptingHandler.post { videoFile?.writeVideoBuffer(data, presentationTimeUs) }
             }
 
             override fun recordingStopped() {
@@ -55,7 +48,7 @@ class RecordingManager(
     }
 
     private fun onRecordingFinished() {
-        videoFile?.close()
+        videoFile?.close() // Вызываем close() без аргументов
         Log.d(TAG, "muxer closed")
         recordingStoppedCallback()
         coroutineScope.launch {
@@ -71,7 +64,11 @@ class RecordingManager(
                 videoCapture.startRecording(
                     executor,
                     object : VideoStreamCapture.OnVideoSavedCallback {
-                        override fun onError(p0: Int, p1: String, p2: Throwable?) {
+                        override fun onError(videoCaptureError: Int, message: String, cause: Throwable?) {
+                            Log.e(TAG, "VideoStreamCapture.onError: $videoCaptureError $message", cause)
+                            onRecordingFinished()
+                            state = State.NOT_RECORDING
+                            onRecordingStopped()
                         }
                     })
                 recordingStartMillis = System.currentTimeMillis()
@@ -88,8 +85,7 @@ class RecordingManager(
         return state
     }
 
-    val recordingTime
-        get() = Duration.ofMillis(System.currentTimeMillis() - recordingStartMillis)
+    val recordingTime get() = Duration.ofMillis(System.currentTimeMillis() - recordingStartMillis)
 
     enum class State {
         RECORDING,
@@ -97,6 +93,6 @@ class RecordingManager(
     }
 }
 
+// Убедитесь, что эти data классы определены (здесь или в другом файле)
 data class VideoInfo(val width: Int, val height: Int, val rotation: Int, val bitrate: Int)
-
 data class AudioInfo(val channelCount: Int, val bitrate: Int, val sampleRate: Int)

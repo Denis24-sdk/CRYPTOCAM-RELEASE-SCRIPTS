@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.keys.KeyManager
+// [ИСПРАВЛЕНО] Добавлен недостающий импорт
+import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.video.AudioInfo
 import com.tnibler.cryptocam.video.VideoInfo
 import cryptocam_age_encryption.Cryptocam_age_encryption
@@ -16,7 +18,7 @@ import org.json.JSONObject
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.time.Clock
+import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -40,18 +42,20 @@ class OutputFileManager(
 
         val outFile = out.createFile("application/binary", filename)
             ?: throw RuntimeException("Error creating output file")
-        val outStream = contentResolver.openOutputStream(outFile.uri)
-            ?: throw RuntimeException("Error opening output file")
-        writePlainTextHeader(outStream)
-        outStream.close()
 
-        val outFd = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.detachFd()
-            ?: throw RuntimeException("Error opening file descriptor")
-        val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
-        val encryptedWriter = Cryptocam_age_encryption.createWriterWithX25519Recipients(
-            outFd.toLong(),
-            recipientsConcat
-        )
+        contentResolver.openOutputStream(outFile.uri)?.use { outStream ->
+            writePlainTextHeader(outStream)
+        } ?: throw RuntimeException("Error opening output file")
+
+        val encryptedWriter = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.use { pfd ->
+            val outFd = pfd.detachFd()
+            val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
+            Cryptocam_age_encryption.createWriterWithX25519Recipients(
+                outFd.toLong(),
+                recipientsConcat
+            )
+        } ?: throw RuntimeException("Error opening file descriptor")
+
         val ef = EncryptedFile(encryptedWriter)
         writeHeader(ef, metadata.size, FileType.VIDEO)
         ef.write(metadata)
@@ -67,55 +71,48 @@ class OutputFileManager(
 
         val outFile = out.createFile("application/binary", filename)
             ?: throw RuntimeException("Error creating output file")
-        val outStream = contentResolver.openOutputStream(outFile.uri)
-            ?: throw RuntimeException("Error opening output file")
-        writePlainTextHeader(outStream)
-        Log.d(TAG, "Wrote plaintext header")
-        outStream.close()
 
-        val outFd = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.detachFd()
-            ?: throw RuntimeException("Error opening file descriptor")
-        val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
-        val encryptedWriter = Cryptocam_age_encryption.createWriterWithX25519Recipients(
-            outFd.toLong(),
-            recipientsConcat
-        )
-        Log.d(TAG, "Created encrypted writer")
+        contentResolver.openOutputStream(outFile.uri)?.use {
+            writePlainTextHeader(it)
+        } ?: throw RuntimeException("Error opening output stream for image")
+
+        val encryptedWriter = contentResolver.openFileDescriptor(outFile.uri, "wa", null)?.use { pfd ->
+            val outFd = pfd.detachFd()
+            val recipientsConcat = recipients.joinToString("\n") { it.publicKey }
+            Cryptocam_age_encryption.createWriterWithX25519Recipients(outFd.toLong(), recipientsConcat)
+        } ?: throw RuntimeException("Error opening file descriptor for image")
+
         val ef = EncryptedFile(encryptedWriter)
         writeHeader(ef, metadata.size, FileType.IMAGE)
         ef.write(metadata)
-        Log.d(TAG, "Wrote metadata")
         return ImageFile(ef)
     }
 
     private fun nextFileName(): String {
-        val pattern = sharedPreferences.getString("outputFileName", "cryptocam-\$num.age") ?: "\$uuid"
-        // variables: $uuid, $year, $month, $day, $hour, $min, $sec, $num
-        val currentNum = sharedPreferences.getInt("outputFileNum", 0) ?: 0
+        val pattern = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_FILE_NAME, "cryptocam-\$\$num.age") ?: "cryptocam-\$\$num.age"
+        val currentNum = sharedPreferences.getInt("fileNum", 0)
         val newNum = currentNum + 1
         sharedPreferences.edit {
-            putInt("outputFileNum", newNum)
+            putInt("fileNum", newNum)
             commit()
         }
         val now = ZonedDateTime.now()
-        return pattern.replace("\$year", now.year.toString())
-            .replace("\$month", String.format("%02d", now.month.value))
-            .replace("\$day", String.format("%02d", now.dayOfMonth))
-            .replace("\$hour", String.format("%02d", now.hour))
-            .replace("\$min", String.format("%02d", now.minute))
-            .replace("\$sec", String.format("%02d", now.second))
+        return pattern
+            .replace("\$year", now.year.toString())
+            .replace("\$month", String.format(Locale.US, "%02d", now.month.value))
+            .replace("\$day", String.format(Locale.US, "%02d", now.dayOfMonth))
+            .replace("\$hour", String.format(Locale.US, "%02d", now.hour))
+            .replace("\$min", String.format(Locale.US, "%02d", now.minute))
+            .replace("\$sec", String.format(Locale.US, "%02d", now.second))
             .replace("\$uuid", UUID.randomUUID().toString())
-            .replace("\$num", String.format("%04d", newNum))
+            .replace("\$\$num", String.format(Locale.US, "%04d", newNum))
     }
 
     private fun writePlainTextHeader(out: OutputStream) {
         val bb = ByteBuffer.allocate(4 + 2 + 1)
-
         bb.order(ByteOrder.BIG_ENDIAN)
-        // magic number
         bb.put(byteArrayOfInts(0x1c, 0x5a, 0x8e, 0x9f))
         bb.order(ByteOrder.LITTLE_ENDIAN)
-        // version
         bb.putShort(1)
         if (recipients.size > 20) {
             throw IllegalStateException("more than 20 age recipients are not possible")
@@ -130,15 +127,12 @@ class OutputFileManager(
     private fun writeHeader(encryptedFile: EncryptedFile, metadataSize: Int, type: FileType) {
         val bb = ByteBuffer.allocate(1 + 4)
         bb.order(ByteOrder.LITTLE_ENDIAN)
-        // file type: only video for now
         val t: Byte = when (type) {
             FileType.VIDEO -> 1
             FileType.IMAGE -> 2
         }
         bb.put(t)
-        // offset to data
         val offsetToData: Int = bb.capacity() + metadataSize
-        // this is a signed int but we're just going to assume we're not writing 2GB of metadata
         bb.putInt(offsetToData)
         encryptedFile.write(bb.array())
     }
@@ -183,7 +177,6 @@ class OutputFileManager(
     }
 
     class VideoFile(private val encryptedFile: EncryptedFile) {
-
         fun writeVideoBuffer(data: ByteArray, presentationTimeStampUs: Long) {
             val bb = ByteBuffer.allocate(1 + 8 + 4)
             bb.order(ByteOrder.LITTLE_ENDIAN)
@@ -193,7 +186,6 @@ class OutputFileManager(
             encryptedFile.write(bb.array())
             encryptedFile.write(data)
         }
-
 
         fun writeAudioBuffer(data: ByteArray, presentationTimeStampUs: Long) {
             val bb = ByteBuffer.allocate(1 + 8 + 4)

@@ -19,11 +19,11 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.ExperimentalCameraFilter
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.Preview
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
@@ -31,34 +31,23 @@ import com.tnibler.cryptocam.Orientation
 import com.tnibler.cryptocam.R
 import com.tnibler.cryptocam.SelectedCamera
 import com.tnibler.cryptocam.databinding.VideoScreenBinding
-import com.tnibler.cryptocam.keys.KeyManager
-import com.tnibler.cryptocam.photo.PhotoKey
-import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.preference.SettingsKey
-import com.zhuinden.simplestack.StateChange
 import com.zhuinden.simplestackextensions.fragmentsktx.backstack
-import com.zhuinden.simplestackextensions.fragmentsktx.lookup
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 
+@ExperimentalCameraFilter
 class VideoFragment : Fragment() {
     private val TAG = javaClass.simpleName
     private var preview: Preview? = null
     private var binding: VideoScreenBinding? = null
-    private val sharedPreferences by lazy {
-        PreferenceManager.getDefaultSharedPreferences(
-            requireContext()
-        )
-    }
-    private val keyManager: KeyManager by lazy { lookup() }
+    private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(requireContext()) }
 
     var service: RecordingService? = null
         private set
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Log.d(TAG, "onServiceConnected")
-            this@VideoFragment.service =
-                (service as RecordingService.RecordingServiceBinder).service
+            this@VideoFragment.service = (service as RecordingService.RecordingServiceBinder).service
             onServiceBound(this@VideoFragment.service!!)
         }
 
@@ -69,7 +58,6 @@ class VideoFragment : Fragment() {
     }
 
     private var currentCamera: SelectedCamera? = null
-
     private val orientationEventListener by lazy {
         object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
@@ -89,9 +77,8 @@ class VideoFragment : Fragment() {
 
     private fun onServiceBound(service: RecordingService) {
         Log.d(TAG, "onServiceBound")
-        service.background()
+        // service.background() // <-- [ИСПРАВЛЕНО] Эта строка удалена
         onStateChanged(service.state.value)
-        service.init(keyManager.selectedRecipients.value)
         lifecycleScope.launchWhenResumed {
             service.state.collect { state ->
                 onStateChanged(state)
@@ -99,11 +86,7 @@ class VideoFragment : Fragment() {
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         return inflater.inflate(R.layout.video_screen, container, false)
     }
 
@@ -111,22 +94,12 @@ class VideoFragment : Fragment() {
         binding = VideoScreenBinding.bind(view)
         val binding = binding!!
         if (!allPermissionsGranted(requireContext())) {
-            val requestPermissions = ActivityResultContracts.RequestMultiplePermissions()
-            registerForActivityResult(requestPermissions) { result ->
+            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
                 if (allPermissionsGranted(requireContext())) {
                     setupUi(binding)
-                    val service = service
-                    if (service == null) {
-                        debugToast("service is null in onViewCreated onActivityResult, all permissions granted")
-                        return@registerForActivityResult
-                    }
-                    service.initUseCases() // use cases are already initialized but references like AudioRecorder are null inside VideoStreamCapture without these permissions
+                    service?.initUseCases()
                 } else {
-                    Toast.makeText(
-                        requireContext(),
-                        "Permissions not granted by the user.",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(requireContext(), "Permissions not granted.", Toast.LENGTH_SHORT).show()
                     activity?.finish()
                 }
             }.launch(REQUIRED_PERMISSIONS)
@@ -137,111 +110,51 @@ class VideoFragment : Fragment() {
 
     private fun setupUi(binding: VideoScreenBinding) {
         binding.run {
-            btnPhoto.setOnClickListener {
-                if (service?.state?.value !is RecordingService.State.Recording) {
-                    backstack.setHistory(listOf(PhotoKey()), StateChange.REPLACE)
-                }
-            }
-            btnFlash.setOnClickListener {
-                service?.toggleFlash()
-            }
-            btnToggleCamera.setOnClickListener {
-                service?.toggleCamera()
-            }
+            btnFlash.setOnClickListener { service?.toggleFlash() }
+            btnToggleCamera.setOnClickListener { service?.toggleCamera() }
             btnRecordVideo.setOnClickListener {
-                // Получаем текущий сервис, если его нет - ничего не делаем
                 val currentService = service ?: return@setOnClickListener
-
-                // Проверяем ТЕКУЩЕЕ СОСТОЯНИЕ сервиса
                 when (currentService.state.value) {
-                    // Если сервис СЕЙЧАС ЗАПИСЫВАЕТ - вызываем ОСТАНОВКУ
-                    is RecordingService.State.Recording -> {
-                        currentService.stopRecording()
-                    }
-                    // Если сервис СЕЙЧАС ГОТОВ К ЗАПИСИ - вызываем СТАРТ
-                    is RecordingService.State.ReadyToRecord -> {
-                        currentService.startRecording()
-                    }
-                    // В любом другом состоянии (например, NotReadyToRecord) - ничего не делаем
-                    else -> {
-                        // Можно добавить лог для отладки, если нужно
-                        Log.d(TAG, "Record button pressed, but service is not in a state to react.")
-                    }
+                    is RecordingService.State.Recording -> currentService.stopRecording()
+                    is RecordingService.State.ReadyToRecord -> currentService.startRecording()
+                    else -> Log.d(TAG, "Record button pressed, but service is not in a state to react.")
                 }
             }
+            btnSettings.setOnClickListener { backstack.goTo(SettingsKey()) }
 
-            btnSettings.setOnClickListener {
-                backstack.goTo(SettingsKey())
-            }
-            if (sharedPreferences.getBoolean(SettingsFragment.PREF_OVERLAY, false)) {
-                lifecycleScope.launchWhenResumed {
-                    while (true) {
-                        overlayText.visibility = when (overlayText.visibility) {
-                            View.VISIBLE -> View.INVISIBLE
-                            else -> View.VISIBLE
-                        }
-                        delay(1000)
-                    }
-                }
-            } else {
-                overlayText.visibility = View.GONE
-            }
+            // [ИСПРАВЛЕНО] Логика для PREF_OVERLAY полностью удалена
         }
     }
 
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume")
-        // connect to service
-        val service = service
         if (service == null) {
-            Log.d(TAG, "Starting Recording service")
-            val recordingServiceIntent = Intent(requireContext(), RecordingService::class.java)
-            requireContext().startService(recordingServiceIntent)
-            requireContext().bindService(
-                recordingServiceIntent,
-                connection,
-                Context.BIND_ABOVE_CLIENT
-            )
+            Log.d(TAG, "Starting and binding Recording service")
+            val intent = Intent(requireContext(), RecordingService::class.java)
+            requireContext().startService(intent)
+            requireContext().bindService(intent, connection, Context.BIND_ABOVE_CLIENT)
         } else {
-            onServiceBound(service)
+            onServiceBound(service!!)
         }
         orientationEventListener.enable()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        val rememberShootingMode = sharedPreferences.getBoolean(SettingsFragment.PREF_REMEMBER_SHOOTING_MODE, false)
-        if (rememberShootingMode) {
-            sharedPreferences.edit { putString(SettingsFragment.LAST_SHOOTING_MODE, "video") }
-        }
     }
 
     private fun onStateChanged(state: RecordingService.State) {
         binding?.run {
             if (state.selectedCamera != currentCamera || preview == null) {
                 when (state) {
-                    is RecordingService.State.ReadyToRecord -> {
-                        setUpPreview(state.resolution, state.surfaceRotation, this)
+                    is RecordingService.State.ReadyToRecord, is RecordingService.State.Recording -> {
+                        val resolution = (state as? RecordingService.State.ReadyToRecord)?.resolution ?: (state as RecordingService.State.Recording).resolution
+                        val surfaceRotation = (state as? RecordingService.State.ReadyToRecord)?.surfaceRotation ?: (state as RecordingService.State.Recording).surfaceRotation
+                        setUpPreview(resolution, surfaceRotation, this)
                         currentCamera = state.selectedCamera
-                        btnPhoto.visibility = View.VISIBLE
                     }
-                    is RecordingService.State.Recording -> {
-                        setUpPreview(state.resolution, state.surfaceRotation, this)
-                        currentCamera = state.selectedCamera
-                        btnPhoto.visibility = View.INVISIBLE
-                    }
-                    is RecordingService.State.NotReadyToRecord -> {
-                        // nothing
-                    }
+                    else -> { /* NotReadyToRecord */ }
                 }
             }
-            btnFlash.setImageResource(
-                when (state.flashOn) {
-                    true -> R.drawable.ic_flash_on
-                    false -> R.drawable.ic_flash_off
-                }
-            )
+            btnFlash.setImageResource(if (state.flashOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+
             when (state) {
                 is RecordingService.State.NotReadyToRecord -> {
                     dotRecording.clearAnimation()
@@ -250,20 +163,13 @@ class VideoFragment : Fragment() {
                     btnSettings.visibility = View.VISIBLE
                     btnToggleCamera.visibility = View.VISIBLE
                     btnRecordVideo.visibility = View.INVISIBLE
-                    btnPhoto.visibility = View.VISIBLE
                 }
                 is RecordingService.State.Recording -> {
                     val d = state.recordingTime
-                    if (d.toHours() > 0) {
-                        recordingTime.text = String.format(
-                            "%02d:%02d:%02d",
-                            d.toHours(),
-                            d.toMinutes() % 60,
-                            d.seconds % 60
-                        )
+                    recordingTime.text = if (d.toHours() > 0) {
+                        String.format("%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
                     } else {
-                        recordingTime.text =
-                            String.format("%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
+                        String.format("%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
                     }
                     if (!animationStarted) {
                         dotRecording.startAnimation(dotBlinkAnimator)
@@ -274,7 +180,6 @@ class VideoFragment : Fragment() {
                     btnToggleCamera.visibility = View.INVISIBLE
                     btnRecordVideo.visibility = View.VISIBLE
                     btnRecordVideo.setImageResource(R.drawable.ic_stop_video)
-                    btnPhoto.visibility = View.INVISIBLE
                 }
                 is RecordingService.State.ReadyToRecord -> {
                     dotRecording.clearAnimation()
@@ -290,84 +195,77 @@ class VideoFragment : Fragment() {
                     )
                     btnRecordVideo.visibility = View.VISIBLE
                     btnRecordVideo.setImageResource(R.drawable.ic_record_video)
-                    btnPhoto.visibility = View.VISIBLE
                 }
             }
         }
     }
 
-    private fun setUpPreview(resolution: Size, surfaceRotation: Int, binding: VideoScreenBinding) =
-        binding.run {
-            Log.d(
-                TAG,
-                "Setting up preview. resolution=$resolution, surfaceRotation=$surfaceRotation"
-            )
-            val service = service
-            if (service == null) {
-                debugToast("service is null in setUpPreview")
-                return
-            }
-            preview?.let { service.unbindUseCase(it) }
-            val display =
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    requireActivity().display!!
-                } else {
-                    requireActivity().windowManager.defaultDisplay
-                }
-            val preview = Preview.Builder()
-                .setTargetRotation(display.rotation)
-                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-                .build()
-            viewFinder.scaleType = PreviewView.ScaleType.FIT_START
-            this@VideoFragment.preview = preview
-            service.bindUseCase(preview)
-            preview.setSurfaceProvider(viewFinder.surfaceProvider)
-
-            val scaleGestureDetector = ScaleGestureDetector(requireContext(), object :
-                ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                override fun onScale(detector: ScaleGestureDetector): Boolean {
-                    service.scaleZoomRatio(detector.scaleFactor)
-                    return true
-                }
-            })
-
-            val gestureDetector = GestureDetector(requireContext(), object :
-                GestureDetector.SimpleOnGestureListener() {
-                override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
-                    val factory = binding.viewFinder.meteringPointFactory
-                    val point = factory.createPoint(event.x, event.y)
-                    val action = FocusMeteringAction.Builder(point).build()
-                    service.startFocusAndMetering(action)
-                    return true
-                }
-            })
-
-            binding.viewFinder.setOnTouchListener { v, event ->
-                if (gestureDetector.onTouchEvent(event)) {
-                    return@setOnTouchListener true
-                }
-                if (scaleGestureDetector.onTouchEvent(event)) {
-                    return@setOnTouchListener true
-                }
-                false
-            }
+    private fun setUpPreview(resolution: Size, surfaceRotation: Int, binding: VideoScreenBinding) = binding.run {
+        val currentService = service ?: run {
+            debugToast("service is null in setUpPreview")
+            return
         }
+        preview?.let { currentService.unbindUseCase(it) }
+
+        val display = view?.display
+        if (display == null) {
+            debugToast("display is null in setUpPreview")
+            return
+        }
+
+        val newPreview = Preview.Builder()
+            .setTargetRotation(display.rotation)
+            .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+            .build()
+
+        viewFinder.scaleType = PreviewView.ScaleType.FIT_START
+        preview = newPreview
+        currentService.bindUseCase(newPreview)
+        newPreview.setSurfaceProvider(viewFinder.surfaceProvider)
+
+        val scaleGestureDetector = ScaleGestureDetector(requireContext(), object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                currentService.scaleZoomRatio(detector.scaleFactor)
+                return true
+            }
+        })
+        val gestureDetector = GestureDetector(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+                val action = FocusMeteringAction.Builder(binding.viewFinder.meteringPointFactory.createPoint(event.x, event.y)).build()
+                currentService.startFocusAndMetering(action)
+                return true
+            }
+        })
+        binding.viewFinder.setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            scaleGestureDetector.onTouchEvent(event)
+            true
+        }
+    }
 
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause")
-        val service = service
-        preview?.let { service?.unbindUseCase(it) }
+        val currentService = service
+        preview?.let { currentService?.unbindUseCase(it) }
         preview = null
-        if (service == null) {
-            return
+
+        if (currentService != null) {
+            // [ИСПРАВЛЕНО] Больше не вызываем service.foreground() напрямую.
+            // Вместо этого просто отвязываемся от сервиса.
+            // Сервис сам решит, нужно ли ему остановиться или уйти в фон,
+            // основываясь на том, идет ли запись.
+            try {
+                requireContext().unbindService(connection)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Service was not registered to be unbound.")
+            }
+
+            // Если запись не идет, сервис остановится сам в onUnbind.
+            // Если запись идет, он продолжит работать в фоне.
+            // Нам больше не нужно управлять этим вручную.
         }
-        if (service.state.value is RecordingService.State.Recording) {
-            service.foreground()
-        } else {
-            service.stopSelf()
-            this.service = null
-        }
+
         orientationEventListener.disable()
     }
 
@@ -379,26 +277,24 @@ class VideoFragment : Fragment() {
 
     private fun rotateUiTo(currentOrientation: Orientation) {
         val degrees = when (currentOrientation) {
-            Orientation.LAND_LEFT -> 90.also { Log.d(TAG, "land left") }
-            Orientation.LAND_RIGHT -> (-90).also { Log.d(TAG, "land right") }
-            Orientation.PORTRAIT -> 0.also { Log.d(TAG, "portrait") }
-        }
+            Orientation.LAND_LEFT -> 90
+            Orientation.LAND_RIGHT -> -90
+            Orientation.PORTRAIT -> 0
+        }.toFloat()
+
         binding?.overlayText?.rotation = when (currentOrientation) {
             Orientation.LAND_RIGHT -> -90f
             Orientation.LAND_LEFT -> 90f
             Orientation.PORTRAIT -> 0f
         }
         binding?.run {
-            listOf(btnFlash, btnPhoto, btnRecordVideo, btnSettings, btnToggleCamera, dotRecording, layoutRecordingTime)
-                .forEach { v ->
-                    v.animate().rotation(degrees.toFloat()).start()
-                }
+            // [ИСПРАВЛЕНО] btnPhoto удален из списка
+            listOf(btnFlash, btnRecordVideo, btnSettings, btnToggleCamera, dotRecording, layoutRecordingTime)
+                .forEach { v -> v.animate().rotation(degrees).start() }
         }
     }
 
-
-    private fun debugToast(msg: String) =
-        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+    private fun debugToast(msg: String) = Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
 
     private var animationStarted = false
     private val dotBlinkAnimator = AlphaAnimation(0.0f, 1.0f).apply {
@@ -409,18 +305,15 @@ class VideoFragment : Fragment() {
     }
 
     companion object {
-        val REQUIRED_PERMISSIONS =
-            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO) +
-                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.TIRAMISU) {
-                        arrayOf(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        arrayOf()
-                    }
+        val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO) +
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    arrayOf()
+                }
 
         fun allPermissionsGranted(context: Context) = REQUIRED_PERMISSIONS.all {
-            ContextCompat.checkSelfPermission(
-                context, it
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 }

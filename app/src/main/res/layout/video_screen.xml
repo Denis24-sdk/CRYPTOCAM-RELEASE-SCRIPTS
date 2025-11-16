@@ -74,19 +74,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/btnRecordVideo" />
 
-    <ImageButton
-        android:id="@+id/btnPhoto"
-        android:layout_width="@dimen/button_size_small"
-        android:layout_height="@dimen/button_size_small"
-        android:background="@drawable/bg_button_round"
-        android:elevation="1dp"
-        android:padding="8dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_photo_camera"
-        app:layout_constraintBottom_toBottomOf="@id/btnRecordVideo"
-        app:layout_constraintStart_toEndOf="@id/btnRecordVideo"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/btnRecordVideo" />
 
     <LinearLayout
         android:id="@+id/layoutRecordingTime"
