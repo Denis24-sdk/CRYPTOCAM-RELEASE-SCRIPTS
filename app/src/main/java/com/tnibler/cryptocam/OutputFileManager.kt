@@ -8,7 +8,6 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.keys.KeyManager
-// [ИСПРАВЛЕНО] Добавлен недостающий импорт
 import com.tnibler.cryptocam.preference.SettingsFragment
 import com.tnibler.cryptocam.video.AudioInfo
 import com.tnibler.cryptocam.video.VideoInfo
@@ -18,7 +17,6 @@ import org.json.JSONObject
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -32,16 +30,23 @@ class OutputFileManager(
     private val context: Context
 ) {
     private val TAG = javaClass.simpleName
+    private val BUSY_PREFIX = "busy_"
 
-    fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFile {
+    // [НОВОЕ] Вспомогательный класс для возврата результата создания файла
+    data class VideoFileCreationResult(val videoFile: VideoFile, val documentFile: DocumentFile)
+
+    fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFileCreationResult {
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
-        val filename = nextFileName()
+
+        // [ИЗМЕНЕНО] Генерируем временное имя файла
+        val finalFileName = nextFileName()
+        val tempFileName = "$BUSY_PREFIX$finalFileName"
 
         val metadata = buildVideoMetadata(videoInfo, audioInfo)
 
-        val outFile = out.createFile("application/binary", filename)
-            ?: throw RuntimeException("Error creating output file")
+        val outFile = out.createFile("application/binary", tempFileName)
+            ?: throw RuntimeException("Error creating output file: $tempFileName")
 
         contentResolver.openOutputStream(outFile.uri)?.use { outStream ->
             writePlainTextHeader(outStream)
@@ -59,10 +64,31 @@ class OutputFileManager(
         val ef = EncryptedFile(encryptedWriter)
         writeHeader(ef, metadata.size, FileType.VIDEO)
         ef.write(metadata)
-        return VideoFile(ef)
+
+        // [ИЗМЕНЕНО] Возвращаем и объект для записи, и сам DocumentFile для будущего переименования
+        return VideoFileCreationResult(VideoFile(ef), outFile)
     }
 
+    // [НОВОЕ] Метод для финализации файла (переименования)
+    fun finalizeVideoFile(tempFile: DocumentFile) {
+        val tempName = tempFile.name ?: return
+        if (tempName.startsWith(BUSY_PREFIX)) {
+            val finalName = tempName.removePrefix(BUSY_PREFIX)
+            try {
+                if (tempFile.renameTo(finalName)) {
+                    Log.d(TAG, "File successfully renamed to $finalName")
+                } else {
+                    Log.e(TAG, "Failed to rename file from $tempName to $finalName")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error renaming file", e)
+            }
+        }
+    }
+
+
     fun newImageFile(): ImageFile {
+        // Логика для изображений остается без изменений, но если понадобится, можно сделать аналогично
         Log.d(TAG, "newImageFile()")
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
@@ -97,7 +123,8 @@ class OutputFileManager(
             commit()
         }
         val now = ZonedDateTime.now()
-        return pattern
+        // [ИСПРАВЛЕНО] Убеждаемся, что расширение всегда ".age" для совместимости
+        val baseName = pattern
             .replace("\$year", now.year.toString())
             .replace("\$month", String.format(Locale.US, "%02d", now.month.value))
             .replace("\$day", String.format(Locale.US, "%02d", now.dayOfMonth))
@@ -106,6 +133,8 @@ class OutputFileManager(
             .replace("\$sec", String.format(Locale.US, "%02d", now.second))
             .replace("\$uuid", UUID.randomUUID().toString())
             .replace("\$\$num", String.format(Locale.US, "%04d", newNum))
+
+        return if (baseName.endsWith(".age")) baseName else "$baseName.age"
     }
 
     private fun writePlainTextHeader(out: OutputStream) {
@@ -206,19 +235,9 @@ class OutputFileManager(
         override fun write(b: Int) {
             encryptedFile.write(byteArrayOf(b.toByte()))
         }
-
-        override fun write(b: ByteArray?) {
-            if (b != null) {
-                encryptedFile.write(b)
-            }
-        }
-
-        override fun close() {
-            encryptedFile.close()
-        }
+        override fun write(b: ByteArray?) { if (b != null) { encryptedFile.write(b) } }
+        override fun close() { encryptedFile.close() }
     }
 
-    enum class FileType {
-        IMAGE, VIDEO
-    }
+    enum class FileType { IMAGE, VIDEO }
 }

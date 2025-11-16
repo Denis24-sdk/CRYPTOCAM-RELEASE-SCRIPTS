@@ -5,6 +5,7 @@ import android.os.HandlerThread
 import android.util.Log
 import androidx.camera.core.EncodedBufferHandler
 import androidx.camera.core.VideoStreamCapture
+import androidx.documentfile.provider.DocumentFile
 import com.tnibler.cryptocam.OutputFileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -29,6 +30,8 @@ class RecordingManager(
     private val encryptingHandler = Handler(encryptingThread.looper)
     private var recordingStartMillis: Long = 0
     private var videoFile: OutputFileManager.VideoFile? = null
+    // [НОВОЕ] Храним ссылку на созданный DocumentFile
+    private var currentDocumentFile: DocumentFile? = null
 
     fun setUp() {
         Log.d(TAG, "setting up muxer")
@@ -48,8 +51,16 @@ class RecordingManager(
     }
 
     private fun onRecordingFinished() {
-        videoFile?.close() // Вызываем close() без аргументов
+        // [ИЗМЕНЕНО] Логика финализации файла
+        videoFile?.close()
         Log.d(TAG, "muxer closed")
+
+        // [НОВОЕ] Переименовываем файл ПОСЛЕ его закрытия
+        currentDocumentFile?.let {
+            outputFileManager.finalizeVideoFile(it)
+            currentDocumentFile = null // Очищаем ссылку
+        }
+
         recordingStoppedCallback()
         coroutineScope.launch {
             setUp()
@@ -59,7 +70,11 @@ class RecordingManager(
     fun recordButtonClicked(): State {
         when (state) {
             State.NOT_RECORDING -> {
-                this.videoFile = outputFileManager.newVideoFile(videoInfo, audioInfo)
+                // [ИЗМЕНЕНО] Получаем результат создания файла
+                val creationResult = outputFileManager.newVideoFile(videoInfo, audioInfo)
+                this.videoFile = creationResult.videoFile
+                this.currentDocumentFile = creationResult.documentFile // Сохраняем DocumentFile
+
                 Log.d(TAG, "new file ready, setting up muxer")
                 videoCapture.startRecording(
                     executor,
