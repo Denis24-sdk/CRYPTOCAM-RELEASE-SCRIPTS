@@ -128,15 +128,7 @@ class RecordingService : Service(), LifecycleOwner {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == null) return START_NOT_STICKY
-        if (intent.action == ApiConstants.ACTION_START) {
-            val keyManager: KeyManager = (application as App).globalServices.get()
-            if (runBlocking { keyManager.availableKeys.first() }.isEmpty()) {
-                startActivity(Intent(this, MainActivity::class.java).apply {
-                    action = ApiConstants.ACTION_CHECK_ENCRYPTION_KEY; addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                })
-                return START_NOT_STICKY
-            }
-        }
+
         when (intent.action) {
             ApiConstants.ACTION_START -> handleStartCommand(intent); ApiConstants.ACTION_STOP -> handleStopCommand()
         }
@@ -144,8 +136,22 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun handleStartCommand(intent: Intent) {
-        if (state.value is State.Recording || isStopping) { if (isStopping) pendingStartIntent = intent; return }
+        // [ИСПРАВЛЕНО] Перемещаем foreground() в самое начало.
+        // Это гарантирует, что startForeground() будет вызван немедленно.
         foreground()
+
+        if (state.value is State.Recording) {
+            Log.w(TAG, "Start command received, but recording is already in progress. Ignoring.")
+            return
+        }
+        if (isStopping) {
+            Log.w(TAG, "Start command received while stopping. Queuing command.")
+            pendingStartIntent = intent
+            return
+        }
+
+        Log.d(TAG, "===> STEP 1: handleStartCommand CALLED")
+
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
