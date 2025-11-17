@@ -10,6 +10,7 @@ import android.hardware.SensorManager
 import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import android.media.MediaRecorder
 import android.net.Uri
 import android.os.*
 import android.util.Log
@@ -161,7 +162,7 @@ class RecordingService : Service(), LifecycleOwner {
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
-        val useUltraWide: Boolean; val fps: Int; val oisEnabled: Boolean; val eisEnabled: Boolean
+        val useUltraWide: Boolean; var fps: Int; var oisEnabled: Boolean; val eisEnabled: Boolean
         when (mode) {
             ApiConstants.MODE_DAY -> { useUltraWide = true; fps = 60; oisEnabled = false; eisEnabled = false }
             ApiConstants.MODE_NIGHT -> { useUltraWide = false; fps = 30; oisEnabled = true; eisEnabled = false }
@@ -170,6 +171,18 @@ class RecordingService : Service(), LifecycleOwner {
         }
         val resolution = when (resStr.uppercase()) {
             "HD" -> Size(1280, 720); "FHD" -> Size(1920, 1080); "2K" -> Size(2560, 1440); "4K" -> Size(3840, 2160); else -> Size(1920, 1080)
+        }
+        // Корректируем настройки для высоких разрешений
+        if (resolution.width >= 2560) {
+            // Отключаем OIS для высоких разрешений
+            if (oisEnabled) {
+                oisEnabled = false
+                Log.d(TAG, "OIS disabled for high resolution: ${resolution}")
+            }
+            // Для NIGHT режима с 4K используем специальную камеру если настроена
+            if (mode == ApiConstants.MODE_NIGHT && resolution.width >= 3840) {
+                Log.d(TAG, "4K NIGHT mode: Using configured camera for 4K support")
+            }
         }
         currentParams = RecordingParams(mode, resolution, codec, fps, useUltraWide, oisEnabled, eisEnabled)
         startRecordingAction = true
@@ -310,16 +323,44 @@ class RecordingService : Service(), LifecycleOwner {
         val hevcSupported = isHevcSupported(params.resolution.width, params.resolution.height, params.fps)
         val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // Отладочный флаг для тестирования
         val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
-        Log.d(TAG, "Requested codec: ${params.codec}, Resolution: ${params.resolution}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
+        Log.d(TAG, "Mode: ${params.mode}, Resolution: ${params.resolution}, FPS: ${params.fps}, OIS: ${params.isOisEnabled}, EIS: ${params.isEisEnabled}")
+        Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
+        // Устанавливаем битрейт в зависимости от разрешения
+        val bitRate = when {
+            params.resolution.width >= 3840 -> 50_000_000 // 4K: 50 Mbps
+            params.resolution.width >= 2560 -> 30_000_000 // 2K: 30 Mbps
+            params.resolution.width >= 1920 -> 20_000_000 // FHD: 20 Mbps
+            else -> 10_000_000 // HD и ниже: 10 Mbps
+        }
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
-            .setBitRate(10_000_000).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
+            .setBitRate(bitRate).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
-        if (params.fps >= 50) extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(params.fps, params.fps))
+        // Устанавливаем диапазоны FPS согласно требованиям
+        // Для высоких разрешений в NIGHT режиме пробуем разные подходы
+        if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
+            // Для 4K/2K в NIGHT режиме: отключаем OIS и EIS, устанавливаем фиксированный FPS
+            extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0) // OIS OFF
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0) // EIS OFF
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(30, 30))
+            Log.d(TAG, "4K NIGHT mode: OIS and EIS disabled, FPS fixed to 30")
+        } else {
+            val fpsRange = when {
+                params.mode == ApiConstants.MODE_DAY -> Range(50, 60) // DAY: 50-60 FPS
+                params.mode == ApiConstants.MODE_NIGHT -> Range(24, 30) // NIGHT обычное разрешение: 24-30 FPS
+                else -> Range(24, 30) // FRONT: 24-30 FPS
+            }
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
+        }
         extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
+        // Автоэкспозиция и автофокус включены по умолчанию
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
         try {
             videoCapture = builder.build()
             camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
+            val actualResolution = videoCapture?.attachedSurfaceResolution
+            Log.d(TAG, "Camera bound successfully. Requested: ${params.resolution}, Actual surface resolution: $actualResolution")
         } catch (e: Exception) { Log.e(TAG, "Bind to lifecycle failed", e); return }
         camera?.cameraControl?.enableTorch(state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
