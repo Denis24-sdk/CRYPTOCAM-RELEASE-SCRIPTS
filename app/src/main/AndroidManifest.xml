@@ -36,7 +36,7 @@
         <activity
             android:name=".PermissionRationaleActivity"
             android:exported="false"
-            android:theme="@style/Theme.MaterialComponents.DayNight.Dialog.Alert" />
+            android:theme="@style/AppTheme" />
 
         <activity
             android:name=".StartReceiverActivity"

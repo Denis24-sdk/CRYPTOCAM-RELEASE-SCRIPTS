@@ -36,8 +36,6 @@
         <item name="android:windowIsTranslucent">true</item>
         <!-- Отключаем анимацию появления и исчезновения окна -->
         <item name="android:windowAnimationStyle">@null</item>
-        <!-- Указываем системе, что у этого окна нет видимого содержимого -->
-        <item name="android:windowNoDisplay">true</item>
     </style>
 
 </resources>
