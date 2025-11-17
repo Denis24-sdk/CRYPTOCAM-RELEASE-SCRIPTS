@@ -13,6 +13,7 @@ import android.media.MediaFormat
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.*
+import android.os.StatFs
 import android.util.Log
 import android.util.Range
 import android.util.Size
@@ -439,6 +440,15 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
+        // Check storage space before proceeding
+        val outputDirPath = outputLocationStr?.toUri()?.path ?: return
+        if (!checkStorageSpaceBeforeRecording(outputDirPath)) {
+            Log.e(TAG, "Insufficient storage space for recording")
+            Toast.makeText(this, "Insufficient storage space. At least 100MB required.", Toast.LENGTH_LONG).show()
+            stopSelf()
+            return
+        }
+
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
         val videoInfo = VideoInfo(actualRes.width, actualRes.height, when (lastHandledOrientation) {
             Orientation.PORTRAIT -> 90; Orientation.LAND_LEFT -> 0; Orientation.LAND_RIGHT -> 180
@@ -491,6 +501,16 @@ class RecordingService : Service(), LifecycleOwner {
                     vibrateWhileRecording()
                     vibrationCounter = 0
                 }
+
+                // Check storage space during recording
+                val outputLocationStr = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
+                val outputDirPath = outputLocationStr?.toUri()?.path
+                if (outputDirPath != null && !checkStorageSpaceDuringRecording(outputDirPath)) {
+                    Log.w(TAG, "Storage space critically low during recording. Stopping.")
+                    Toast.makeText(this@RecordingService, "Storage space critically low. Stopping recording.", Toast.LENGTH_LONG).show()
+                    stopRecording()
+                    return
+                }
             }
             if (isInForeground) {
                 val d = recManager.recordingTime
@@ -522,7 +542,40 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun debugToast(msg: String) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
-    companion object { const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording" }
+
+    // Storage space management
+    private fun getAvailableStorageBytes(path: String): Long {
+        return try {
+            val stat = StatFs(path)
+            val bytesAvailable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                stat.availableBytes
+            } else {
+                stat.availableBlocks.toLong() * stat.blockSize.toLong()
+            }
+            bytesAvailable
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking storage space", e)
+            Long.MAX_VALUE // Assume plenty of space if can't check
+        }
+    }
+
+    private fun checkStorageSpaceBeforeRecording(outputPath: String): Boolean {
+        val availableBytes = getAvailableStorageBytes(outputPath)
+        val minRequiredBytes = 100L * 1024 * 1024 // 100 MB minimum
+        return availableBytes > minRequiredBytes
+    }
+
+    private fun checkStorageSpaceDuringRecording(outputPath: String): Boolean {
+        val availableBytes = getAvailableStorageBytes(outputPath)
+        val criticalThreshold = 50L * 1024 * 1024 // 50 MB critical threshold
+        return availableBytes > criticalThreshold
+    }
+
+    companion object {
+        const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording"
+        private const val MIN_STORAGE_BYTES = 100L * 1024 * 1024 // 100 MB
+        private const val CRITICAL_STORAGE_BYTES = 50L * 1024 * 1024 // 50 MB
+    }
     inner class RecordingServiceBinder : Binder() { val service: RecordingService get() = this@RecordingService }
     sealed class State(open val selectedCamera: SelectedCamera, open val flashOn: Boolean) {
         data class Recording(val resolution: Size, val surfaceRotation: Int, val recordingTime: Duration, override val selectedCamera: SelectedCamera, override val flashOn: Boolean) : State(selectedCamera, flashOn)
