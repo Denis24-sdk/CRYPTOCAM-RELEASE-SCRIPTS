@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.SensorManager
-import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodecList
 import android.media.MediaFormat
@@ -18,6 +17,8 @@ import android.util.Range
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
+import android.graphics.SurfaceTexture
+import android.hardware.camera2.CameraCharacteristics
 import android.widget.Toast
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
@@ -186,6 +187,8 @@ class RecordingService : Service(), LifecycleOwner {
         } catch (e: Exception) { return false }
     }
 
+
+
     // Функция для тестирования поддержки HEVC на устройстве
     fun testHevcSupport(): String {
         val testCases = listOf(
@@ -307,7 +310,7 @@ class RecordingService : Service(), LifecycleOwner {
         val hevcSupported = isHevcSupported(params.resolution.width, params.resolution.height, params.fps)
         val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // Отладочный флаг для тестирования
         val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
-        Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
+        Log.d(TAG, "Requested codec: ${params.codec}, Resolution: ${params.resolution}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
             .setBitRate(10_000_000).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
