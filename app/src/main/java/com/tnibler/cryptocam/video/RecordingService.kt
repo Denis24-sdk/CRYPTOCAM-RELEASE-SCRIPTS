@@ -117,6 +117,11 @@ class RecordingService : Service(), LifecycleOwner {
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         orientationEventListener.enable()
         (applicationContext as App).recordingService = this
+
+
+
+        // Логируем поддержку HEVC при запуске сервиса
+        Log.d(TAG, "HEVC Support Test:\n${testHevcSupport()}")
     }
 
     override fun onDestroy() {
@@ -179,6 +184,20 @@ class RecordingService : Service(), LifecycleOwner {
             val caps = mediaCodecList.codecInfos.first { it.name == encoderName }.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
             return caps.videoCapabilities.isSizeSupported(width, height) && caps.videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())
         } catch (e: Exception) { return false }
+    }
+
+    // Функция для тестирования поддержки HEVC на устройстве
+    fun testHevcSupport(): String {
+        val testCases = listOf(
+            Triple(1920, 1080, 30), // FHD 30fps
+            Triple(1920, 1080, 60), // FHD 60fps
+            Triple(3840, 2160, 30), // 4K 30fps
+            Triple(2560, 1440, 30), // 2K 30fps
+        )
+        val results = testCases.map { (w, h, fps) ->
+            "HEVC ${w}x${h}@${fps}fps: ${if (isHevcSupported(w, h, fps)) "SUPPORTED" else "NOT SUPPORTED"}"
+        }
+        return results.joinToString("\n")
     }
 
     private fun handleStopCommand() {
@@ -285,7 +304,10 @@ class RecordingService : Service(), LifecycleOwner {
             cameraSelectorBuilder.requireLensFacing(if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK)
         }
         cameraSelector = cameraSelectorBuilder.build()
-        val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && isHevcSupported(params.resolution.width, params.resolution.height, params.fps)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
+        val hevcSupported = isHevcSupported(params.resolution.width, params.resolution.height, params.fps)
+        val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // Отладочный флаг для тестирования
+        val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
+        Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
             .setBitRate(10_000_000).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
