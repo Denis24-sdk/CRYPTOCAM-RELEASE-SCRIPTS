@@ -11,12 +11,11 @@ class PermissionRationaleActivity : AppCompatActivity() {
         setContentView(R.layout.activity_permission_rationale)
 
         findViewById<Button>(R.id.button_go_to_settings).setOnClickListener {
-            // Создаем интент, который открывает системные настройки именно для нашего приложения
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", packageName, null)
             }
             startActivity(intent)
-            finish() // Закрываем этот экран после перехода
+            finish()
         }
     }
 }

@@ -11,7 +11,7 @@ import com.tnibler.cryptocam.video.RecordingService
 import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestackextensions.servicesktx.add
 
-@ExperimentalCameraFilter // <-- ИСПРАВЛЕНИЕ: Используем прямую аннотацию вместо @OptIn
+@ExperimentalCameraFilter
 class App : Application() {
     lateinit var globalServices: GlobalServices
         private set

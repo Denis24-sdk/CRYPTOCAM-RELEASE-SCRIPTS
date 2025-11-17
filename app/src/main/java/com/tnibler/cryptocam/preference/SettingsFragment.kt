@@ -84,7 +84,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     availableCamerasCategory.addPreference(Preference(context).apply {
                         title = "Camera ID: $id"
                         summary = summaryText
-                        isSelectable = false // Делаем элемент некликабельным
+                        isSelectable = false // элемент некликабельный
                     })
                 }
             }

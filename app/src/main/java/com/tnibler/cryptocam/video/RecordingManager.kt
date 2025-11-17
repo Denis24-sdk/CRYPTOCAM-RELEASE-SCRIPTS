@@ -30,7 +30,6 @@ class RecordingManager(
     private val encryptingHandler = Handler(encryptingThread.looper)
     private var recordingStartMillis: Long = 0
     private var videoFile: OutputFileManager.VideoFile? = null
-    // [НОВОЕ] Храним ссылку на созданный DocumentFile
     private var currentDocumentFile: DocumentFile? = null
 
     fun setUp() {
@@ -51,14 +50,12 @@ class RecordingManager(
     }
 
     private fun onRecordingFinished() {
-        // [ИЗМЕНЕНО] Логика финализации файла
         videoFile?.close()
         Log.d(TAG, "muxer closed")
 
-        // [НОВОЕ] Переименовываем файл ПОСЛЕ его закрытия
         currentDocumentFile?.let {
             outputFileManager.finalizeVideoFile(it)
-            currentDocumentFile = null // Очищаем ссылку
+            currentDocumentFile = null
         }
 
         recordingStoppedCallback()
@@ -70,10 +67,9 @@ class RecordingManager(
     fun recordButtonClicked(): State {
         when (state) {
             State.NOT_RECORDING -> {
-                // [ИЗМЕНЕНО] Получаем результат создания файла
                 val creationResult = outputFileManager.newVideoFile(videoInfo, audioInfo)
                 this.videoFile = creationResult.videoFile
-                this.currentDocumentFile = creationResult.documentFile // Сохраняем DocumentFile
+                this.currentDocumentFile = creationResult.documentFile
 
                 Log.d(TAG, "new file ready, setting up muxer")
                 videoCapture.startRecording(
@@ -108,6 +104,5 @@ class RecordingManager(
     }
 }
 
-// Убедитесь, что эти data классы определены (здесь или в другом файле)
 data class VideoInfo(val width: Int, val height: Int, val rotation: Int, val bitrate: Int)
 data class AudioInfo(val channelCount: Int, val bitrate: Int, val sampleRate: Int)

@@ -32,14 +32,12 @@ class OutputFileManager(
     private val TAG = javaClass.simpleName
     private val BUSY_PREFIX = "busy_"
 
-    // [НОВОЕ] Вспомогательный класс для возврата результата создания файла
     data class VideoFileCreationResult(val videoFile: VideoFile, val documentFile: DocumentFile)
 
     fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFileCreationResult {
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
 
-        // [ИЗМЕНЕНО] Генерируем временное имя файла
         val finalFileName = nextFileName()
         val tempFileName = "$BUSY_PREFIX$finalFileName"
 
@@ -65,11 +63,9 @@ class OutputFileManager(
         writeHeader(ef, metadata.size, FileType.VIDEO)
         ef.write(metadata)
 
-        // [ИЗМЕНЕНО] Возвращаем и объект для записи, и сам DocumentFile для будущего переименования
         return VideoFileCreationResult(VideoFile(ef), outFile)
     }
 
-    // [НОВОЕ] Метод для финализации файла (переименования)
     fun finalizeVideoFile(tempFile: DocumentFile) {
         val tempName = tempFile.name ?: return
         if (tempName.startsWith(BUSY_PREFIX)) {
@@ -88,7 +84,6 @@ class OutputFileManager(
 
 
     fun newImageFile(): ImageFile {
-        // Логика для изображений остается без изменений, но если понадобится, можно сделать аналогично
         Log.d(TAG, "newImageFile()")
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
@@ -123,7 +118,6 @@ class OutputFileManager(
             commit()
         }
         val now = ZonedDateTime.now()
-        // [ИСПРАВЛЕНО] Убеждаемся, что расширение всегда ".age" для совместимости
         val baseName = pattern
             .replace("\$year", now.year.toString())
             .replace("\$month", String.format(Locale.US, "%02d", now.month.value))

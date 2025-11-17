@@ -31,21 +31,15 @@ class CameraDebugFragment : Fragment() {
         try {
             val cameraManager = requireContext().getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
-            // --- НАЧАЛО ИЗМЕНЕНИЙ (Новый API для Android 11+) ---
-
             // На Android 11+ используем новый API, чтобы увидеть скрытые камеры
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // Этот вызов требует Executor.
                 cameraManager.registerAvailabilityCallback(Executors.newSingleThreadExecutor(),
                     object : CameraManager.AvailabilityCallback() {
                         override fun onCameraAccessPrioritiesChanged() {
-                            // Нам это не нужно, но метод нужно переопределить
                         }
 
-                        // Этот метод будет вызван со списком ВСЕХ камер
                         override fun onCameraAvailable(cameraId: String) {
                             super.onCameraAvailable(cameraId)
-                            // Мы не можем обновить UI из этого потока, поэтому делаем это в основном
                             activity?.runOnUiThread {
                                 updateCameraList(cameraManager)
                             }
@@ -55,11 +49,11 @@ class CameraDebugFragment : Fragment() {
 
             // Для всех версий сначала показываем то, что доступно сразу
             updateCameraList(cameraManager)
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
             // Создаем ListView для отображения результата
             val listView = ListView(requireContext()).apply {
-                id = android.R.id.list // Даем ID, чтобы его можно было найти
+                id = android.R.id.list
             }
             return listView
 
@@ -69,7 +63,6 @@ class CameraDebugFragment : Fragment() {
         }
     }
 
-    // Выносим логику обновления списка в отдельную функцию
     private fun updateCameraList(cameraManager: CameraManager) {
         val cameraIds = cameraManager.cameraIdList
 

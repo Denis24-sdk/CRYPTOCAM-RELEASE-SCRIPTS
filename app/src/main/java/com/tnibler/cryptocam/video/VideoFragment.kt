@@ -77,7 +77,6 @@ class VideoFragment : Fragment() {
 
     private fun onServiceBound(service: RecordingService) {
         Log.d(TAG, "onServiceBound")
-        // service.background() // <-- [ИСПРАВЛЕНО] Эта строка удалена
         onStateChanged(service.state.value)
         lifecycleScope.launchWhenResumed {
             service.state.collect { state ->
@@ -122,7 +121,6 @@ class VideoFragment : Fragment() {
             }
             btnSettings.setOnClickListener { backstack.goTo(SettingsKey()) }
 
-            // [ИСПРАВЛЕНО] Логика для PREF_OVERLAY полностью удалена
         }
     }
 
@@ -251,19 +249,13 @@ class VideoFragment : Fragment() {
         preview = null
 
         if (currentService != null) {
-            // [ИСПРАВЛЕНО] Больше не вызываем service.foreground() напрямую.
-            // Вместо этого просто отвязываемся от сервиса.
-            // Сервис сам решит, нужно ли ему остановиться или уйти в фон,
-            // основываясь на том, идет ли запись.
+
             try {
                 requireContext().unbindService(connection)
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "Service was not registered to be unbound.")
             }
 
-            // Если запись не идет, сервис остановится сам в onUnbind.
-            // Если запись идет, он продолжит работать в фоне.
-            // Нам больше не нужно управлять этим вручную.
         }
 
         orientationEventListener.disable()
@@ -288,7 +280,6 @@ class VideoFragment : Fragment() {
             Orientation.PORTRAIT -> 0f
         }
         binding?.run {
-            // [ИСПРАВЛЕНО] btnPhoto удален из списка
             listOf(btnFlash, btnRecordVideo, btnSettings, btnToggleCamera, dotRecording, layoutRecordingTime)
                 .forEach { v -> v.animate().rotation(degrees).start() }
         }

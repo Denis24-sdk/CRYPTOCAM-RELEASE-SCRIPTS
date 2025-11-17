@@ -2,7 +2,7 @@ package com.tnibler.cryptocam.video
 
 import android.util.Size
 
-// Добавляем новые поля
+
 data class RecordingParams(
     val mode: String,
     val resolution: Size,

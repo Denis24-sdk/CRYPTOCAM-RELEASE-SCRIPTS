@@ -19,6 +19,7 @@ import com.tnibler.cryptocam.video.RecordingService
 import com.zhuinden.simplestackextensions.servicesktx.get
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import androidx.core.net.toUri
 
 @ExperimentalCameraFilter
 class StartReceiverActivity : AppCompatActivity() {
@@ -39,20 +40,17 @@ class StartReceiverActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ШАГ 1: Проверка ключа шифрования
         val hasKeys = runBlocking { keyManager.availableKeys.first().isNotEmpty() }
         if (!hasKeys) {
             launchKeySetup()
             return
         }
 
-        // [НОВОЕ] ШАГ 2: Проверка папки для сохранения
         if (!outputDirExists()) {
             launchOutputPicker()
             return
         }
 
-        // ШАГ 3: Проверка разрешений
         val requiredPermissions = getRequiredPermissions()
         val missingPermissions = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -66,12 +64,11 @@ class StartReceiverActivity : AppCompatActivity() {
         }
     }
 
-    // [НОВОЕ] Функция для проверки существования и доступности папки
     private fun outputDirExists(): Boolean {
         return try {
             val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
                 ?: return false
-            val docFile = DocumentFile.fromTreeUri(this, Uri.parse(savedUri))
+            val docFile = DocumentFile.fromTreeUri(this, savedUri.toUri())
             docFile?.exists() == true && docFile.canWrite()
         } catch (e: Exception) {
             false
@@ -117,7 +114,6 @@ class StartReceiverActivity : AppCompatActivity() {
         finish()
     }
 
-    // [НОВОЕ] Функция для запуска экрана выбора папки
     private fun launchOutputPicker() {
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             action = ApiConstants.ACTION_FORCE_OUTPUT_PICKER

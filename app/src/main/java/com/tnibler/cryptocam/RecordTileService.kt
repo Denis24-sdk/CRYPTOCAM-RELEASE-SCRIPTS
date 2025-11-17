@@ -5,7 +5,9 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.TileService
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.camera.core.ExperimentalCameraFilter
 import com.tnibler.cryptocam.video.RecordingService
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -26,6 +28,7 @@ class RecordTileService : TileService() {
         Log.d(TAG, "onStopListening")
     }
 
+    @OptIn(ExperimentalCameraFilter::class)
     override fun onClick() {
         super.onClick()
         Log.d(TAG, "onClick")
@@ -48,6 +51,7 @@ class RecordTileService : TileService() {
         }
     }
 
+    @OptIn(ExperimentalCameraFilter::class)
     private fun update() {
         val service = (application as App).recordingService
         if (service != null) {

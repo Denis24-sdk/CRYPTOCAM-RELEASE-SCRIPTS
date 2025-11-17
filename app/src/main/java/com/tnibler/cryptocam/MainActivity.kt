@@ -34,6 +34,7 @@ import com.zhuinden.simplestackextensions.servicesktx.get
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import com.zhuinden.simplestackextensions.servicesktx.lookup
+import androidx.core.net.toUri
 
 @SuppressLint("RestrictedApi")
 @ExperimentalCameraFilter
@@ -67,15 +68,15 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         handleIntent(intent)
     }
 
-    // [ИСПРАВЛЕНО] Логика онбординга изменена
+    //  Логика онбординга
     private fun regularStart(initialKeyOverride: DefaultFragmentKey? = null) {
         val keys = runBlocking { keyManager.availableKeys.first() }
         val outputDirSet = !sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null).isNullOrEmpty()
 
         val initialKey = initialKeyOverride ?: when {
             keys.isEmpty() -> PickKeyKey()
-            !outputDirSet -> PickOutputDirKey() // Проверяем только то, что настройка была сохранена
-            else -> KeysKey() // Если все настроено, можно показать экран ключей
+            !outputDirSet -> PickOutputDirKey()
+            else -> KeysKey()
         }
 
         val initialHistory = listOf(initialKey)
@@ -151,7 +152,6 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 regularStart()
                 return
             }
-            // [ИЗМЕНЕНО] Упрощенная проверка
             val outputDirIsSet = !sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null).isNullOrEmpty()
             val firstKey = if (outputDirIsSet) VideoKey() else PickOutputDirKey()
             val initialHistory = listOf(firstKey, KeysKey(recipient))
@@ -166,7 +166,6 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 backstack.setHistory(initialHistory, StateChange.REPLACE)
             }
         } else {
-            // Если это не специальная команда, закрываем Activity, чтобы не было UI
             if (isTaskRoot) {
                 finish()
             }
@@ -210,12 +209,11 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         }
     }
 
-    // Эта функция теперь не используется для определения онбординга, но может быть полезна в других местах.
     private fun outputDirExists(): Boolean {
         return try {
             val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null) ?: return false
-            val df = DocumentFile.fromTreeUri(this, Uri.parse(savedUri)) ?: return false
-            df.exists() && df.canWrite() // Добавлена проверка на запись
+            val df = DocumentFile.fromTreeUri(this, savedUri.toUri()) ?: return false
+            df.exists() && df.canWrite()
         } catch (e: Exception) {
             false
         }

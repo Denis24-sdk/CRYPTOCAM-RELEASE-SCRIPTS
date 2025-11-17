@@ -50,7 +50,7 @@ import java.time.Duration
 import java.util.*
 
 @ExperimentalCameraFilter
-@ExperimentalCamera2Interop // <-- [ИСПРАВЛЕНО] Добавлена аннотация
+@ExperimentalCamera2Interop
 class RecordingService : Service(), LifecycleOwner {
     private val TAG = javaClass.simpleName
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
@@ -131,8 +131,6 @@ class RecordingService : Service(), LifecycleOwner {
         (applicationContext as App).recordingService = this
 
 
-
-        // Логируем поддержку HEVC при запуске сервиса
         Log.d(TAG, "HEVC Support Test:\n${testHevcSupport()}")
     }
 
@@ -153,8 +151,7 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun handleStartCommand(intent: Intent) {
-        // [ИСПРАВЛЕНО] Перемещаем foreground() в самое начало.
-        // Это гарантирует, что startForeground() будет вызван немедленно.
+
         foreground()
 
         if (state.value is State.Recording) {
@@ -182,7 +179,8 @@ class RecordingService : Service(), LifecycleOwner {
         val resolution = when (resStr.uppercase()) {
             "HD" -> Size(1280, 720); "FHD" -> Size(1920, 1080); "2K" -> Size(2560, 1440); "4K" -> Size(3840, 2160); else -> Size(1920, 1080)
         }
-        // Корректируем настройки для высоких разрешений
+
+        // настройки для высоких разрешений
         if (resolution.width >= 2560) {
             // Отключаем OIS для высоких разрешений
             if (oisEnabled) {
@@ -241,8 +239,6 @@ class RecordingService : Service(), LifecycleOwner {
 
 
 
-    // --- ПУБЛИЧНЫЕ МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ---
-
     fun startRecording() {
         if (state.value is State.ReadyToRecord) {
             recordingManager?.recordButtonClicked()
@@ -296,7 +292,6 @@ class RecordingService : Service(), LifecycleOwner {
         camera?.cameraControl?.startFocusAndMetering(action)
     }
 
-    // --- ВНУТРЕННИЕ МЕТОДЫ СЕРВИСА ---
 
     private fun foreground() {
         if (isInForeground) return
@@ -339,11 +334,11 @@ class RecordingService : Service(), LifecycleOwner {
         }
         cameraSelector = cameraSelectorBuilder.build()
         val hevcSupported = isHevcSupported(params.resolution.width, params.resolution.height, params.fps)
-        val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // Отладочный флаг для тестирования
+        val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // флаг для тестирования
         val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
         Log.d(TAG, "Mode: ${params.mode}, Resolution: ${params.resolution}, FPS: ${params.fps}, OIS: ${params.isOisEnabled}, EIS: ${params.isEisEnabled}")
         Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
-        // Сначала устанавливаем битрейт на основе запрошенного разрешения
+        // устанавливаем битрейт
         val initialBitRate = when {
             params.resolution.width >= 3840 -> 50_000_000 // 4K: 50 Mbps
             params.resolution.width >= 2560 -> 30_000_000 // 2K: 30 Mbps
@@ -353,7 +348,7 @@ class RecordingService : Service(), LifecycleOwner {
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
             .setBitRate(initialBitRate).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
-        // Устанавливаем диапазоны FPS согласно требованиям
+        // Устанавливаем диапазоны FPS
         // Для высоких разрешений в NIGHT режиме пробуем разные подходы
         if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
             // Для 4K/2K в NIGHT режиме: отключаем OIS и EIS, устанавливаем фиксированный FPS
@@ -435,19 +430,16 @@ class RecordingService : Service(), LifecycleOwner {
         val keyManager: KeyManager = (application as App).globalServices.get()
         val recipients = runBlocking { keyManager.selectedRecipients.first() }
 
-        // --- НАЧАЛО ИЗМЕНЕНИЙ: НОВАЯ, БОЛЕЕ НАДЕЖНАЯ ПРОВЕРКА ---
         var isOutputDirectoryOk = false
         if (!outputLocationStr.isNullOrEmpty() && recipients.isNotEmpty()) {
             try {
                 val dirUri = outputLocationStr.toUri()
 
-                // 1. Проверяем, есть ли у нас сохраненное разрешение в системе. Это главный и самый надежный способ.
                 val hasPersistedPermission = contentResolver.persistedUriPermissions.any {
                     it.uri == dirUri && it.isWritePermission
                 }
 
                 if (hasPersistedPermission) {
-                    // 2. Только если разрешение есть, делаем вторичную проверку на существование папки.
                     val docFile = DocumentFile.fromTreeUri(this, dirUri)
                     if (docFile != null && docFile.exists()) {
                         isOutputDirectoryOk = true
@@ -461,7 +453,6 @@ class RecordingService : Service(), LifecycleOwner {
                 Log.e(TAG, "Error while checking output directory permissions", e)
             }
         }
-        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         // Если папка не выбрана, недоступна или нет ключей шифрования
         if (!isOutputDirectoryOk || videoCapture == null) {
@@ -480,7 +471,7 @@ class RecordingService : Service(), LifecycleOwner {
                 Toast.makeText(this, "No encryption key selected.", Toast.LENGTH_LONG).show()
             }
 
-            stopSelf() // Останавливаем сервис, так как запись невозможна
+            stopSelf()
             return
         }
 
@@ -560,10 +551,9 @@ class RecordingService : Service(), LifecycleOwner {
                 val d = recManager.recordingTime
                 val text = if (d.toHours() > 0) String.format(Locale.US, "%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
                 else String.format(Locale.US, "%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
-                // [ИСПРАВЛЕНО] Добавлена проверка разрешений
+                // проверка разрешений
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     ContextCompat.checkSelfPermission(this@RecordingService, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    // Не можем обновить уведомление, но сервис продолжит работать
                 } else {
                     notificationManager.notify(notificationId, notificationBuilder.setContentText(getString(R.string.notification_text, text)).build())
                 }
