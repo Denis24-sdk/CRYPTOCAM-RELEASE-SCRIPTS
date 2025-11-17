@@ -2,6 +2,8 @@ package com.tnibler.cryptocam.preference
 
 import android.content.Context
 import android.content.Intent
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -49,6 +51,51 @@ class SettingsFragment : PreferenceFragmentCompat() {
             dialogTitle = "Enter Camera ID for Front Mode"
             setOnBindEditTextListener { editText -> editText.inputType = InputType.TYPE_CLASS_NUMBER }
         })
+
+
+        // --- НОВЫЙ БЛОК: СПИСОК ДОСТУПНЫХ КАМЕР ---
+        val availableCamerasCategory = PreferenceCategory(context).apply {
+            title = "Available Cameras"
+            summary = "List of all cameras detected on this device. Use these IDs for manual assignment above."
+        }
+        screen.addPreference(availableCamerasCategory)
+
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val cameraIds = cameraManager.cameraIdList
+
+            if (cameraIds.isEmpty()) {
+                availableCamerasCategory.addPreference(Preference(context).apply {
+                    title = "No cameras found on this device"
+                    isEnabled = false
+                })
+            } else {
+                cameraIds.forEach { id ->
+                    val characteristics = cameraManager.getCameraCharacteristics(id)
+                    val lensFacing = when (characteristics.get(CameraCharacteristics.LENS_FACING)) {
+                        CameraCharacteristics.LENS_FACING_FRONT -> "Front"
+                        CameraCharacteristics.LENS_FACING_BACK -> "Back"
+                        CameraCharacteristics.LENS_FACING_EXTERNAL -> "External"
+                        else -> "Unknown"
+                    }
+                    val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    val summaryText = "Lens: $lensFacing | Focal lengths: ${focalLengths?.joinToString() ?: "N/A"}"
+
+                    availableCamerasCategory.addPreference(Preference(context).apply {
+                        title = "Camera ID: $id"
+                        summary = summaryText
+                        isSelectable = false // Делаем элемент некликабельным
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            availableCamerasCategory.addPreference(Preference(context).apply {
+                title = "Error accessing cameras"
+                summary = e.message
+                isEnabled = false
+            })
+        }
+
 
         // --- ОБЩИЕ НАСТРОЙКИ ---
         val generalCategory = PreferenceCategory(context).apply { title = "General Settings" }
