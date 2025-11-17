@@ -194,10 +194,17 @@ class RecordingService : Service(), LifecycleOwner {
         try {
             val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
+            format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             val encoderName = mediaCodecList.findEncoderForFormat(format) ?: return false
             val caps = mediaCodecList.codecInfos.first { it.name == encoderName }.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
-            return caps.videoCapabilities.isSizeSupported(width, height) && caps.videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())
-        } catch (e: Exception) { return false }
+            val supported = caps.videoCapabilities.isSizeSupported(width, height) &&
+                           caps.videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())
+            Log.d(TAG, "HEVC check for ${width}x${height}@${frameRate}fps: $supported (encoder: $encoderName)")
+            return supported
+        } catch (e: Exception) {
+            Log.e(TAG, "HEVC support check failed", e)
+            return false
+        }
     }
 
 
