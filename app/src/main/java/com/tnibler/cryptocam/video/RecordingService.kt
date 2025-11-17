@@ -94,6 +94,14 @@ class RecordingService : Service(), LifecycleOwner {
         } else { @Suppress("DEPRECATION") vibrator.vibrate(pattern, -1) }
     }
 
+    @SuppressLint("MissingPermission")
+    private fun vibrateWhileRecording() {
+        if (!sharedPreferences.getBoolean(SettingsFragment.PREF_VIBRATE_WHILE_RECORDING, true)) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else { @Suppress("DEPRECATION") vibrator.vibrate(50) }
+    }
+
     private fun buildOrientationEventListener(): OrientationEventListener {
         return object : OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
@@ -246,6 +254,7 @@ class RecordingService : Service(), LifecycleOwner {
         if (state.value is State.Recording) {
             recordingManager?.recordButtonClicked()
             updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
+            vibrationCounter = 0 // Reset vibration counter when stopping recording
             val currentState = state.value as State.Recording
             _state.value = State.ReadyToRecord(currentState.resolution, currentState.surfaceRotation, currentState.selectedCamera, currentState.flashOn)
         }
@@ -415,10 +424,19 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private val updateRecordingStateHandler = Handler(Looper.getMainLooper())
+    private var vibrationCounter = 0
     private val updateRecordingStateRunnable: Runnable = object : Runnable {
         override fun run() {
             val recManager = recordingManager ?: return
-            if (state.value is State.Recording) { _state.value = (state.value as State.Recording).copy(recordingTime = recManager.recordingTime) }
+            if (state.value is State.Recording) {
+                _state.value = (state.value as State.Recording).copy(recordingTime = recManager.recordingTime)
+                // Vibrate every 5 seconds (25 * 200ms = 5 seconds)
+                vibrationCounter++
+                if (vibrationCounter >= 25) {
+                    vibrateWhileRecording()
+                    vibrationCounter = 0
+                }
+            }
             if (isInForeground) {
                 val d = recManager.recordingTime
                 val text = if (d.toHours() > 0) String.format(Locale.US, "%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
