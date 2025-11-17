@@ -109,6 +109,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }) { uri ->
             uri ?: return@registerForActivityResult
+            requireContext().contentResolver.takePersistableUriPermission(uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             requireNotNull(preferenceManager.sharedPreferences).edit {
                 putString(PREF_OUTPUT_DIRECTORY, uri.toString())
                 commit()

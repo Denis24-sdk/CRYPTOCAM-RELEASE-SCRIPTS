@@ -11,7 +11,7 @@ import android.view.KeyEvent
 import android.view.Window
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.ExperimentalCameraFilter // [ИСПРАВЛЕНО] Добавлен импорт
+import androidx.camera.core.ExperimentalCameraFilter
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.databinding.ActivityMainBinding
@@ -36,7 +36,7 @@ import kotlinx.coroutines.runBlocking
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 
 @SuppressLint("RestrictedApi")
-@ExperimentalCameraFilter // [ИСПРАВЛЕНО] Добавлена аннотация для всего класса
+@ExperimentalCameraFilter
 class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
     private val TAG = javaClass.simpleName
     private lateinit var binding: ActivityMainBinding
@@ -67,16 +67,15 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         handleIntent(intent)
     }
 
-    // [ИСПРАВЛЕНО] Метод упрощен, убрана вся логика онбординга
+    // [ИСПРАВЛЕНО] Логика онбординга изменена
     private fun regularStart(initialKeyOverride: DefaultFragmentKey? = null) {
         val keys = runBlocking { keyManager.availableKeys.first() }
+        val outputDirSet = !sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null).isNullOrEmpty()
 
         val initialKey = initialKeyOverride ?: when {
             keys.isEmpty() -> PickKeyKey()
-            !outputDirExists() -> PickOutputDirKey()
-            // Если все настроено, по умолчанию можно показать экран ключей или настроек,
-            // но так как UI не должен появляться, этот путь почти не будет использоваться.
-            else -> KeysKey()
+            !outputDirSet -> PickOutputDirKey() // Проверяем только то, что настройка была сохранена
+            else -> KeysKey() // Если все настроено, можно показать экран ключей
         }
 
         val initialHistory = listOf(initialKey)
@@ -125,14 +124,12 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 regularStart(KeysKey())
                 return
             }
-            // --- НАЧАЛО ИЗМЕНЕНИЙ ---
             ApiConstants.ACTION_OPEN_OUTPUT_PICKER,
             ApiConstants.ACTION_FORCE_OUTPUT_PICKER -> {
                 Log.d(TAG, "Output picker screen action received")
                 regularStart(PickOutputDirKey())
                 return
             }
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             ApiConstants.ACTION_CHECK_ENCRYPTION_KEY -> {
                 Log.d(TAG, "Check encryption key action received")
                 val keys = runBlocking { keyManager.availableKeys.first() }
@@ -154,7 +151,9 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
                 regularStart()
                 return
             }
-            val firstKey = if (outputDirExists()) VideoKey() else PickOutputDirKey()
+            // [ИЗМЕНЕНО] Упрощенная проверка
+            val outputDirIsSet = !sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null).isNullOrEmpty()
+            val firstKey = if (outputDirIsSet) VideoKey() else PickOutputDirKey()
             val initialHistory = listOf(firstKey, KeysKey(recipient))
             if (!isNavigationSetUp) {
                 Navigator.configure()
@@ -176,7 +175,6 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
 
     override fun onPause() {
         super.onPause()
-        // Логика для PhotoViewModel больше не релевантна в этом контексте, но не вызывает ошибки
     }
 
     override fun onResume() {
@@ -184,7 +182,6 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
         Log.d(TAG, "onResume()")
     }
 
-    // Этот метод больше не используется для основной логики, но оставляем его, т.к. он не мешает
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             if (backstack.canFindService(VolumeKeyPressListener::class.java.name)) {
@@ -198,27 +195,27 @@ class MainActivity : AppCompatActivity(), SimpleStateChanger.NavigationHandler {
 
     fun nextOnboardingScreen(currentDestination: DefaultFragmentKey) {
         Log.d(TAG, "nextOnboardingScreen(${currentDestination.javaClass.simpleName})")
+        val outputDirIsSet = !sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null).isNullOrEmpty()
         when (currentDestination) {
             is PickKeyKey -> {
-                if (!outputDirExists()) {
+                if (!outputDirIsSet) {
                     backstack.goTo(PickOutputDirKey())
                 } else {
-                    // После выбора ключа просто закрываем Activity
                     finish()
                 }
             }
             is PickOutputDirKey -> {
-                // После выбора папки закрываем Activity
                 finish()
             }
         }
     }
 
+    // Эта функция теперь не используется для определения онбординга, но может быть полезна в других местах.
     private fun outputDirExists(): Boolean {
         return try {
             val savedUri = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null) ?: return false
             val df = DocumentFile.fromTreeUri(this, Uri.parse(savedUri)) ?: return false
-            df.exists()
+            df.exists() && df.canWrite() // Добавлена проверка на запись
         } catch (e: Exception) {
             false
         }

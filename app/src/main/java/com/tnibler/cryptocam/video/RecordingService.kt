@@ -31,6 +31,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.*
 import androidx.preference.PreferenceManager
 import com.tnibler.cryptocam.*
@@ -170,7 +171,7 @@ class RecordingService : Service(), LifecycleOwner {
         val mode = intent.getStringExtra(ApiConstants.EXTRA_MODE) ?: ApiConstants.MODE_DAY
         val resStr = intent.getStringExtra(ApiConstants.EXTRA_RESOLUTION) ?: "FHD"
         val codec = intent.getStringExtra(ApiConstants.EXTRA_CODEC) ?: ApiConstants.CODEC_AVC
-        val useUltraWide: Boolean; var fps: Int; var oisEnabled: Boolean; val eisEnabled: Boolean
+        val useUltraWide: Boolean; val fps: Int; var oisEnabled: Boolean; val eisEnabled: Boolean
         when (mode) {
             ApiConstants.MODE_DAY -> { useUltraWide = true; fps = 60; oisEnabled = false; eisEnabled = false }
             ApiConstants.MODE_NIGHT -> { useUltraWide = false; fps = 30; oisEnabled = true; eisEnabled = false }
@@ -388,33 +389,87 @@ class RecordingService : Service(), LifecycleOwner {
         val outputLocationStr = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
         val keyManager: KeyManager = (application as App).globalServices.get()
         val recipients = runBlocking { keyManager.selectedRecipients.first() }
-        if (outputLocationStr == null || recipients.isEmpty() || videoCapture == null) return
+
+        // --- НАЧАЛО ИЗМЕНЕНИЙ: НОВАЯ, БОЛЕЕ НАДЕЖНАЯ ПРОВЕРКА ---
+        var isOutputDirectoryOk = false
+        if (!outputLocationStr.isNullOrEmpty() && recipients.isNotEmpty()) {
+            try {
+                val dirUri = outputLocationStr.toUri()
+
+                // 1. Проверяем, есть ли у нас сохраненное разрешение в системе. Это главный и самый надежный способ.
+                val hasPersistedPermission = contentResolver.persistedUriPermissions.any {
+                    it.uri == dirUri && it.isWritePermission
+                }
+
+                if (hasPersistedPermission) {
+                    // 2. Только если разрешение есть, делаем вторичную проверку на существование папки.
+                    val docFile = DocumentFile.fromTreeUri(this, dirUri)
+                    if (docFile != null && docFile.exists()) {
+                        isOutputDirectoryOk = true
+                    } else {
+                        Log.e(TAG, "Directory permission is persisted, but the folder itself does not exist or cannot be accessed.")
+                    }
+                } else {
+                    Log.e(TAG, "No persisted write permission found for the saved directory URI.")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error while checking output directory permissions", e)
+            }
+        }
+        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+        // Если папка не выбрана, недоступна или нет ключей шифрования
+        if (!isOutputDirectoryOk || videoCapture == null) {
+            Log.e(TAG, "Pre-recording check failed. isOutputDirectoryOk=$isOutputDirectoryOk, videoCapture==null is ${videoCapture == null}")
+
+            if (!isOutputDirectoryOk) {
+                Toast.makeText(this, "Output directory permission issue. Please select it again.", Toast.LENGTH_LONG).show()
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    action = ApiConstants.ACTION_FORCE_OUTPUT_PICKER
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            }
+
+            if (recipients.isEmpty()) {
+                Toast.makeText(this, "No encryption key selected.", Toast.LENGTH_LONG).show()
+            }
+
+            stopSelf() // Останавливаем сервис, так как запись невозможна
+            return
+        }
+
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
         val videoInfo = VideoInfo(actualRes.width, actualRes.height, when (lastHandledOrientation) {
             Orientation.PORTRAIT -> 90; Orientation.LAND_LEFT -> 0; Orientation.LAND_RIGHT -> 180
         }, 10_000_000)
         val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
-        val outputFileManager = OutputFileManager(outputLocationStr.toUri(), recipients, contentResolver, sharedPreferences, this)
-        recordingManager = RecordingManager(videoCapture!!, videoInfo, audioInfo, ContextCompat.getMainExecutor(this), lifecycleScope, outputFileManager,
-            recordingStoppedCallback = {
-                isStopping = false
-                if (stopServiceAfterRecording) {
-                    stopServiceAfterRecording = false
-                    if (pendingStartIntent == null) {
-                        // [ИСПРАВЛЕНО] Совместимый вызов stopForeground
-                        @Suppress("DEPRECATION")
-                        stopForeground(true)
-                        isInForeground = false
-                        stopSelf()
+
+        val outputFileManager = outputLocationStr?.let { OutputFileManager(it.toUri(), recipients, contentResolver, sharedPreferences, this) }
+
+        recordingManager = outputFileManager?.let {
+            RecordingManager(videoCapture!!, videoInfo, audioInfo, ContextCompat.getMainExecutor(this), lifecycleScope,
+                it,
+                recordingStoppedCallback = {
+                    isStopping = false
+                    if (stopServiceAfterRecording) {
+                        stopServiceAfterRecording = false
+                        if (pendingStartIntent == null) {
+                            @Suppress("DEPRECATION")
+                            stopForeground(true)
+                            isInForeground = false
+                            stopSelf()
+                        }
                     }
-                }
-                pendingStartIntent?.let { val intent = it; pendingStartIntent = null; handleStartCommand(intent) }
-            },
-            onRecordingStarted = { vibrateOnStart() },
-            onRecordingStopped = { vibrateOnStop() }
-        )
+                    pendingStartIntent?.let { val intent = it; pendingStartIntent = null; handleStartCommand(intent) }
+                },
+                onRecordingStarted = { vibrateOnStart() },
+                onRecordingStopped = { vibrateOnStop() }
+            )
+        }
+
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) {
-            recordingManager!!.setUp()
+            recordingManager?.setUp()
             if (state.value is State.NotReadyToRecord) {
                 val currentState = state.value as State.NotReadyToRecord
                 _state.value = State.ReadyToRecord(resolution, surfaceRotation, currentState.selectedCamera, currentState.flashOn)
