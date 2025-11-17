@@ -343,15 +343,15 @@ class RecordingService : Service(), LifecycleOwner {
         val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
         Log.d(TAG, "Mode: ${params.mode}, Resolution: ${params.resolution}, FPS: ${params.fps}, OIS: ${params.isOisEnabled}, EIS: ${params.isEisEnabled}")
         Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
-        // Устанавливаем битрейт в зависимости от разрешения
-        val bitRate = when {
+        // Сначала устанавливаем битрейт на основе запрошенного разрешения
+        val initialBitRate = when {
             params.resolution.width >= 3840 -> 50_000_000 // 4K: 50 Mbps
             params.resolution.width >= 2560 -> 30_000_000 // 2K: 30 Mbps
             params.resolution.width >= 1920 -> 20_000_000 // FHD: 20 Mbps
             else -> 10_000_000 // HD и ниже: 10 Mbps
         }
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
-            .setBitRate(bitRate).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
+            .setBitRate(initialBitRate).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
         // Устанавливаем диапазоны FPS согласно требованиям
         // Для высоких разрешений в NIGHT режиме пробуем разные подходы
@@ -379,6 +379,50 @@ class RecordingService : Service(), LifecycleOwner {
             camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
             val actualResolution = videoCapture?.attachedSurfaceResolution
             Log.d(TAG, "Camera bound successfully. Requested: ${params.resolution}, Actual surface resolution: $actualResolution")
+
+            // Adjust bitrate based on actual resolution if it differs significantly
+            val actualBitRate = when {
+                actualResolution?.width ?: 0 >= 3840 -> 50_000_000 // 4K: 50 Mbps
+                actualResolution?.width ?: 0 >= 2560 -> 30_000_000 // 2K: 30 Mbps
+                actualResolution?.width ?: 0 >= 1920 -> 20_000_000 // FHD: 20 Mbps
+                else -> 10_000_000 // HD and below: 10 Mbps
+            }
+
+            if (actualBitRate != initialBitRate && actualResolution != null) {
+                Log.d(TAG, "Bitrate adjusted from $initialBitRate to $actualBitRate based on actual resolution $actualResolution")
+                // Unbind and rebuild with correct bitrate
+                localCameraProvider.unbind(videoCapture!!)
+                val correctedBuilder = VideoStreamCapture.Builder()
+                    .setVideoFrameRate(params.fps)
+                    .setCameraSelector(cameraSelector)
+                    .setTargetResolution(params.resolution)
+                    .setBitRate(actualBitRate)
+                    .setTargetRotation(Surface.ROTATION_90)
+                    .setIFrameInterval(1)
+                    .setVideoCodec(finalCodec)
+                val correctedExtender = Camera2Interop.Extender(correctedBuilder)
+                // Reapply the same settings
+                if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
+                    correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0)
+                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0)
+                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(30, 30))
+                } else {
+                    val fpsRange = when {
+                        params.mode == ApiConstants.MODE_DAY -> Range(50, 60)
+                        params.mode == ApiConstants.MODE_NIGHT -> Range(24, 30)
+                        else -> Range(24, 30)
+                    }
+                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
+                }
+                correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+
+                videoCapture = correctedBuilder.build()
+                camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
+                Log.d(TAG, "Rebound with corrected bitrate: $actualBitRate")
+            }
         } catch (e: Exception) { Log.e(TAG, "Bind to lifecycle failed", e); return }
         camera?.cameraControl?.enableTorch(state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
