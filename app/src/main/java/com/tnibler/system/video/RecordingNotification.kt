@@ -7,28 +7,56 @@ import android.os.Build
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalCameraFilter
 import androidx.core.app.NotificationCompat
-import androidx.preference.PreferenceManager // Добавлен импорт
+import androidx.preference.PreferenceManager
 import com.tnibler.system.App
 import com.tnibler.system.R
-import com.tnibler.system.preference.SettingsFragment // Добавлен импорт для ключей
+import com.tnibler.system.preference.SettingsFragment
 
 @OptIn(ExperimentalCameraFilter::class)
 fun notificationBuilder(context: Context): NotificationCompat.Builder {
 
-    // 1. Получаем настройки
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
 
-    // 2. Читаем заголовок (если пусто — берем из R.string)
+    // 1. Получаем тексты
     val customTitle = prefs.getString(
         SettingsFragment.PREF_NOTIFICATION_TITLE,
         context.getString(R.string.notification_title)
     ) ?: context.getString(R.string.notification_title)
 
-    // 3. Читаем текст (если пусто — берем из R.string)
     val customText = prefs.getString(
         SettingsFragment.PREF_NOTIFICATION_TEXT,
         context.getString(R.string.notification_text)
     ) ?: context.getString(R.string.notification_text)
+
+    val iconType = prefs.getString(SettingsFragment.PREF_NOTIFICATION_ICON, "info")
+
+    val iconResId = when (iconType) {
+        // Базовые
+        "alert"    -> android.R.drawable.ic_dialog_alert
+        "email"    -> android.R.drawable.ic_dialog_email
+        "info"     -> android.R.drawable.ic_dialog_info
+
+        // Системные процессы
+        "cloud"    -> android.R.drawable.ic_menu_upload       // Выглядит как стрелка вверх/облако
+        "lock"     -> android.R.drawable.ic_lock_lock         // Замок (если доступен) или ic_secure
+        "settings" -> android.R.drawable.ic_menu_preferences
+        "save"     -> android.R.drawable.ic_menu_save         // Дискета
+        "search"   -> android.R.drawable.ic_menu_search       // Лупа
+
+        // Другие
+        "map"      -> android.R.drawable.ic_dialog_map
+        "call"     -> android.R.drawable.ic_menu_call         // Телефонная трубка
+        "camera"   -> android.R.drawable.ic_menu_camera       // Камера
+        "play"     -> android.R.drawable.ic_media_play        // Треугольник Play
+
+        // Fallback (на всякий случай)
+        else -> {
+            // Если вдруг ic_lock_lock недоступен на некоторых версиях Android,
+            // вернем безопасный вариант для lock, иначе дефолт
+            if (iconType == "lock") android.R.drawable.ic_secure else android.R.drawable.ic_dialog_info
+        }
+    }
+
 
     val emptyIntent = Intent()
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or
@@ -36,9 +64,9 @@ fun notificationBuilder(context: Context): NotificationCompat.Builder {
     val pendingIntent = PendingIntent.getActivity(context, 0, emptyIntent, flags)
 
     return NotificationCompat.Builder(context, App.CHANNEL_ID)
-        .setContentTitle(customTitle) // Ставим кастомный заголовок
-        .setContentText(customText)   // Ставим кастомный текст
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle(customTitle)
+        .setContentText(customText)
+        .setSmallIcon(iconResId) // <-- Используем выбранную иконку
         .setContentIntent(pendingIntent)
         .setOngoing(true)
         .setLocalOnly(true)

@@ -178,6 +178,48 @@ class SettingsFragment : PreferenceFragmentCompat() {
             summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
         })
 
+        // --- ВЫБОР ИКОНКИ ---
+        val iconList = ListPreference(context).apply {
+            key = PREF_NOTIFICATION_ICON
+            title = "Notification Icon"
+            summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
+            dialogTitle = "Choose icon style"
+
+            entries = arrayOf(
+                "Info (Standard)",       // Инфо
+                "Alert / Warning",       // Тревога
+                "Email / Message",       // Почта
+                "Cloud / Upload",        // Облако / Загрузка
+                "Security / Lock",       // Замок
+                "Settings / Gear",       // Шестеренка
+                "Map / Location",        // Карта
+                "Search / Magnifier",    // Лупа
+                "Call / Phone",          // Телефон
+                "Save / Disk",           // Дискета / Сохранение
+                "Camera",                // Камера
+                "Play / Media"           // Значок Play
+            )
+
+            entryValues = arrayOf(
+                "info",
+                "alert",
+                "email",
+                "cloud",
+                "lock",
+                "settings",
+                "map",
+                "search",
+                "call",
+                "save",
+                "camera",
+                "play"
+            )
+
+            setDefaultValue("info")
+        }
+        notificationCategory.addPreference(iconList)
+
+
 
         // --- НАСТРОЙКИ ПОВЕДЕНИЯ ---
         val behaviorCategory = PreferenceCategory(context).apply { title = "Behavior" }
@@ -219,6 +261,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         const val PREF_NOTIFICATION_TITLE = "pref_custom_notif_title"
         const val PREF_NOTIFICATION_TEXT = "pref_custom_notif_text"
+        const val PREF_NOTIFICATION_ICON = "pref_custom_notif_icon"
 
         const val PREF_VIBRATE_ON_START = "pref_vibrate_on_start"
         const val PREF_VIBRATE_ON_STOP = "pref_vibrate_on_stop"
