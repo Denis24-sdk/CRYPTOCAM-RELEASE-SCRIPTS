@@ -230,7 +230,20 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun handleStopCommand() {
-        if (state.value !is State.Recording || isStopping) return
+        // 1. ВАЖНО: Всегда вызываем foreground().
+        // Если сервис был перезапущен этой командой, система требует уведомление,
+        // иначе приложение упадет с ошибкой (ForegroundServiceDidNotStartInTimeException).
+        foreground()
+
+        // 2. Если запись уже не идет (или сервис только проснулся)
+        if (state.value !is State.Recording) {
+            Log.d(TAG, "Stop command received, but recording is not active. Stopping service.")
+            // Просто убиваем сервис, так как работы для него нет
+            stopSelf()
+            return
+        }
+
+        if (isStopping) return
         isStopping = true; stopServiceAfterRecording = true; stopRecording()
     }
 
