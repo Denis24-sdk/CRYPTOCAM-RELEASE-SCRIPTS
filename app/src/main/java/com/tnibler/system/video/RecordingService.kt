@@ -126,9 +126,6 @@ class RecordingService : Service(), LifecycleOwner {
         resolution = getVideoResolutionFromPrefs()
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         (applicationContext as App).recordingService = this
-
-
-        Log.d(TAG, "HEVC Support Test:\n${testHevcSupport()}")
     }
 
     override fun onDestroy() {
@@ -193,38 +190,25 @@ class RecordingService : Service(), LifecycleOwner {
         if (cameraProvider == null) initCamera() else initUseCases()
     }
 
-    @SuppressLint("NewApi")
-    private fun isHevcSupported(width: Int, height: Int, frameRate: Int): Boolean {
+    private fun isHevcSupported(): Boolean {
         try {
-            val mediaCodecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
-            format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
-            val encoderName = mediaCodecList.findEncoderForFormat(format) ?: return false
-            val caps = mediaCodecList.codecInfos.first { it.name == encoderName }.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
-            val supported = caps.videoCapabilities.isSizeSupported(width, height) &&
-                           caps.videoCapabilities.getSupportedFrameRatesFor(width, height).contains(frameRate.toDouble())
-            Log.d(TAG, "HEVC check for ${width}x${height}@${frameRate}fps: $supported (encoder: $encoderName)")
-            return supported
+            val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+            // Ищем любой энкодер, который поддерживает HEVC (H.265)
+            for (info in list.codecInfos) {
+                if (!info.isEncoder) continue
+                try {
+                    val types = info.supportedTypes
+                    for (type in types) {
+                        if (type.equals(MediaFormat.MIMETYPE_VIDEO_HEVC, ignoreCase = true)) {
+                            return true
+                        }
+                    }
+                } catch (e: Exception) { continue }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "HEVC support check failed", e)
-            return false
+            Log.e(TAG, "Error checking HEVC support", e)
         }
-    }
-
-
-
-    // Функция для тестирования поддержки HEVC на устройстве
-    fun testHevcSupport(): String {
-        val testCases = listOf(
-            Triple(1920, 1080, 30), // FHD 30fps
-            Triple(1920, 1080, 60), // FHD 60fps
-            Triple(3840, 2160, 30), // 4K 30fps
-            Triple(2560, 1440, 30), // 2K 30fps
-        )
-        val results = testCases.map { (w, h, fps) ->
-            "HEVC ${w}x${h}@${fps}fps: ${if (isHevcSupported(w, h, fps)) "SUPPORTED" else "NOT SUPPORTED"}"
-        }
-        return results.joinToString("\n")
+        return false
     }
 
     private fun handleStopCommand() {
@@ -244,9 +228,6 @@ class RecordingService : Service(), LifecycleOwner {
         if (isStopping) return
         isStopping = true; stopServiceAfterRecording = true; stopRecording()
     }
-
-
-
 
     fun startRecording() {
         if (state.value is State.ReadyToRecord) {
@@ -301,7 +282,6 @@ class RecordingService : Service(), LifecycleOwner {
         camera?.cameraControl?.startFocusAndMetering(action)
     }
 
-
     private fun foreground() {
         if (isInForeground) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) return
@@ -327,12 +307,15 @@ class RecordingService : Service(), LifecycleOwner {
         val localCameraProvider = cameraProvider ?: return
         localCameraProvider.unbindAll()
         val params = currentParams ?: return
+
+        // 1. Выбор камеры
         val customCameraId = sharedPreferences.getString(when (params.mode) {
             ApiConstants.MODE_DAY -> SettingsFragment.PREF_CAMERA_ID_DAY
             ApiConstants.MODE_NIGHT -> SettingsFragment.PREF_CAMERA_ID_NIGHT
             ApiConstants.MODE_FRONT -> SettingsFragment.PREF_CAMERA_ID_FRONT
             else -> null
         }, null)?.trim()
+
         val cameraSelectorBuilder = CameraSelector.Builder()
         if (!customCameraId.isNullOrBlank()) {
             cameraSelectorBuilder.addCameraFilter { it.filter { Camera2CameraInfo.from(it).cameraId == customCameraId } }
@@ -342,94 +325,173 @@ class RecordingService : Service(), LifecycleOwner {
             cameraSelectorBuilder.requireLensFacing(if (params.mode == ApiConstants.MODE_FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK)
         }
         cameraSelector = cameraSelectorBuilder.build()
-        val hevcSupported = isHevcSupported(params.resolution.width, params.resolution.height, params.fps)
-        val forceHevcForTesting = sharedPreferences.getBoolean("debug_force_hevc", false) // флаг для тестирования
-        val finalCodec = if (params.codec.equals(ApiConstants.CODEC_HEVC, true) && (hevcSupported || forceHevcForTesting)) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
-        Log.d(TAG, "Mode: ${params.mode}, Resolution: ${params.resolution}, FPS: ${params.fps}, OIS: ${params.isOisEnabled}, EIS: ${params.isEisEnabled}")
-        Log.d(TAG, "Requested codec: ${params.codec}, HEVC supported: $hevcSupported, Force HEVC: $forceHevcForTesting, Final codec: $finalCodec")
-        // устанавливаем битрейт
+
+        // 2. Определяем кодек
+        val hevcExists = isHevcSupported()
+        val userWantsHevc = params.codec.equals(ApiConstants.CODEC_HEVC, true)
+
+        var targetCodec = if (userWantsHevc && hevcExists) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
+
         val initialBitRate = when {
-            params.resolution.width >= 3840 -> 50_000_000 // 4K: 50 Mbps
-            params.resolution.width >= 2560 -> 30_000_000 // 2K: 30 Mbps
-            params.resolution.width >= 1920 -> 20_000_000 // FHD: 20 Mbps
-            else -> 10_000_000 // HD и ниже: 10 Mbps
+            params.resolution.width >= 3840 -> 50_000_000
+            params.resolution.width >= 2560 -> 30_000_000
+            params.resolution.width >= 1920 -> 20_000_000
+            else -> 10_000_000
         }
-        val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
-            .setBitRate(initialBitRate).setTargetRotation(Surface.ROTATION_0).setIFrameInterval(1).setVideoCodec(finalCodec)
-        val extender = Camera2Interop.Extender(builder)
-        // Устанавливаем диапазоны FPS
-        // Для высоких разрешений в NIGHT режиме пробуем разные подходы
-        if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
-            // Для 4K/2K в NIGHT режиме: отключаем OIS и EIS, устанавливаем фиксированный FPS
-            extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0) // OIS OFF
-            extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0) // EIS OFF
-            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(30, 30))
-            Log.d(TAG, "4K NIGHT mode: OIS and EIS disabled, FPS fixed to 30")
-        } else {
-            val fpsRange = when {
-                params.mode == ApiConstants.MODE_DAY -> Range(50, 60) // DAY: 50-60 FPS
-                params.mode == ApiConstants.MODE_NIGHT -> Range(24, 30) // NIGHT обычное разрешение: 24-30 FPS
-                else -> Range(24, 30) // FRONT: 24-30 FPS
+
+        Log.d(TAG, "Attempting init with codec: $targetCodec (UserWants=$userWantsHevc, Hardware=$hevcExists)")
+
+        // 3. Попытка запуска с Fallback
+        try {
+            setupVideoCapture(localCameraProvider, targetCodec, initialBitRate)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to setup video capture with codec $targetCodec", e)
+
+            if (targetCodec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
+                Log.w(TAG, "Fallback: Trying AVC because HEVC failed.")
+                try {
+                    setupVideoCapture(localCameraProvider, MediaFormat.MIMETYPE_VIDEO_AVC, initialBitRate)
+                } catch (retryE: Exception) {
+                    Log.e(TAG, "Fatal: Failed to setup video capture even with AVC", retryE)
+                }
             }
+        }
+    }
+
+    // Вынесенная логика настройки VideoCapture
+    @SuppressLint("RestrictedApi")
+    private fun setupVideoCapture(provider: ProcessCameraProvider, codec: String, rawBitRate: Int) {
+        val params = currentParams ?: return
+
+        // --- ИСПРАВЛЕНИЕ HEVC ---
+        // HEVC намного эффективнее. Если мы подаем ему тот же битрейт, что и для AVC (например 50Мбит),
+        // мобильный энкодер может отказать (так как это требует слишком высокого Profile Level)
+        // и молча переключиться на AVC.
+        // Поэтому для HEVC мы снижаем битрейт. Качество визуально будет таким же.
+        val adjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
+            rawBitRate / 2
+        } else {
+            rawBitRate
+        }
+
+        Log.d(TAG, "Setup VideoCapture. Codec=$codec, RawBitrate=$rawBitRate, AdjustedBitrate=$adjustedBitRate")
+
+        val builder = VideoStreamCapture.Builder()
+            .setVideoFrameRate(params.fps)
+            .setCameraSelector(cameraSelector)
+            .setTargetResolution(params.resolution)
+            .setBitRate(adjustedBitRate) // Используем скорректированный битрейт
+            .setTargetRotation(Surface.ROTATION_0)
+            .setIFrameInterval(1)
+            .setVideoCodec(codec)
+
+        val extender = Camera2Interop.Extender(builder)
+
+        val fpsRange = when {
+            params.mode == ApiConstants.MODE_DAY -> Range(50, 60)
+            params.mode == ApiConstants.MODE_NIGHT -> Range(24, 30)
+            else -> Range(24, 30)
+        }
+
+        if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
+            extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0)
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0)
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
+        } else {
             extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
         }
+
         extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
-        // Автоэкспозиция и автофокус включены по умолчанию
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
-        try {
-            videoCapture = builder.build()
-            camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
-            val actualResolution = videoCapture?.attachedSurfaceResolution
-            Log.d(TAG, "Camera bound successfully. Requested: ${params.resolution}, Actual surface resolution: $actualResolution")
 
-            // Adjust bitrate based on actual resolution if it differs significantly
-            val actualBitRate = when {
-                actualResolution?.width ?: 0 >= 3840 -> 50_000_000 // 4K: 50 Mbps
-                actualResolution?.width ?: 0 >= 2560 -> 30_000_000 // 2K: 30 Mbps
-                actualResolution?.width ?: 0 >= 1920 -> 20_000_000 // FHD: 20 Mbps
-                else -> 10_000_000 // HD and below: 10 Mbps
+        videoCapture = builder.build()
+        camera = provider.bindToLifecycle(this, cameraSelector, videoCapture!!)
+
+        val actualRes = videoCapture?.attachedSurfaceResolution
+        Log.d(TAG, "SUCCESS bind: Codec=$codec, ReqRes=${params.resolution}, ActualRes=$actualRes")
+
+        // --- ПРОВЕРКА СООТНОШЕНИЯ СТОРОН ---
+        val w = actualRes?.width?.toFloat() ?: 0f
+        val h = actualRes?.height?.toFloat() ?: 1f
+        val ratio = if (w > h) w / h else h / w
+
+        val isBadAspectRatio = ratio < 1.5
+
+        var finalResolution = params.resolution
+
+        // Базовый расчет битрейта (высокий, для AVC)
+        var newRawBitRate = rawBitRate
+
+        if (isBadAspectRatio) {
+            Log.w(TAG, "Aspect Ratio mismatch! Got 4:3 ($actualRes). Forcing Vertical orientation of REQUESTED resolution.")
+            val minDim = Math.min(params.resolution.width, params.resolution.height)
+            val maxDim = Math.max(params.resolution.width, params.resolution.height)
+            finalResolution = Size(minDim, maxDim)
+
+            newRawBitRate = when {
+                maxDim >= 3840 -> 50_000_000
+                maxDim >= 2560 -> 30_000_000
+                maxDim >= 1920 -> 20_000_000
+                else -> 10_000_000
+            }
+        } else {
+            newRawBitRate = when {
+                actualRes?.width ?: 0 >= 3840 -> 50_000_000
+                actualRes?.width ?: 0 >= 2560 -> 30_000_000
+                actualRes?.width ?: 0 >= 1920 -> 20_000_000
+                else -> 10_000_000
+            }
+        }
+
+        // Снова применяем логику HEVC для нового битрейта
+        val finalAdjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
+            newRawBitRate / 2
+        } else {
+            newRawBitRate
+        }
+
+        // --- ЛОГИКА ПЕРЕСОЗДАНИЯ (Rebinding) ---
+        // Сравниваем с adjustedBitRate (текущим), чтобы понять, изменилось ли что-то
+        if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio) && actualRes != null) {
+            Log.d(TAG, "Rebinding needed. NewBitrate=$finalAdjustedBitRate (Raw=$newRawBitRate), NewRes=$finalResolution")
+            provider.unbind(videoCapture!!)
+
+            val correctedBuilder = VideoStreamCapture.Builder()
+                .setVideoFrameRate(params.fps)
+                .setCameraSelector(cameraSelector)
+                .setTargetResolution(finalResolution)
+                .setBitRate(finalAdjustedBitRate) // ВАЖНО: используем сниженный битрейт
+                .setTargetRotation(Surface.ROTATION_0)
+                .setIFrameInterval(1)
+                .setVideoCodec(codec)
+
+            val correctedExtender = Camera2Interop.Extender(correctedBuilder)
+
+            if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
+                correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0)
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0)
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
+            } else {
+                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
             }
 
-            if (actualBitRate != initialBitRate && actualResolution != null) {
-                Log.d(TAG, "Bitrate adjusted from $initialBitRate to $actualBitRate based on actual resolution $actualResolution")
-                // Unbind and rebuild with correct bitrate
-                localCameraProvider.unbind(videoCapture!!)
-                val correctedBuilder = VideoStreamCapture.Builder()
-                    .setVideoFrameRate(params.fps)
-                    .setCameraSelector(cameraSelector)
-                    .setTargetResolution(params.resolution)
-                    .setBitRate(actualBitRate)
-                    .setTargetRotation(Surface.ROTATION_0)
-                    .setIFrameInterval(1)
-                    .setVideoCodec(finalCodec)
-                val correctedExtender = Camera2Interop.Extender(correctedBuilder)
-                // Reapply the same settings
-                if (params.resolution.width >= 2560 && params.mode == ApiConstants.MODE_NIGHT) {
-                    correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, 0)
-                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, 0)
-                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(30, 30))
-                } else {
-                    val fpsRange = when {
-                        params.mode == ApiConstants.MODE_DAY -> Range(50, 60)
-                        params.mode == ApiConstants.MODE_NIGHT -> Range(24, 30)
-                        else -> Range(24, 30)
-                    }
-                    correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
-                }
-                correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
-                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
-                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-                correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+            correctedExtender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (params.isOisEnabled) 1 else 0)
+            correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (params.isEisEnabled) 1 else 0)
+            correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            correctedExtender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
 
-                videoCapture = correctedBuilder.build()
-                camera = localCameraProvider.bindToLifecycle(this, cameraSelector, videoCapture!!)
-                Log.d(TAG, "Rebound with corrected bitrate: $actualBitRate")
-            }
-        } catch (e: Exception) { Log.e(TAG, "Bind to lifecycle failed", e); return }
+            videoCapture = correctedBuilder.build()
+            camera = provider.bindToLifecycle(this, cameraSelector, videoCapture!!)
+
+            val newRes = videoCapture?.attachedSurfaceResolution
+            Log.d(TAG, "Rebound finish. ActualRes=$newRes")
+        }
+
         camera?.cameraControl?.enableTorch(state.value.flashOn)
         _state.value = State.NotReadyToRecord(true, state.value.selectedCamera, state.value.flashOn)
+
         initRecording()
     }
 
@@ -559,19 +621,19 @@ class RecordingService : Service(), LifecycleOwner {
                     return
                 }
             }
-                /*
-                if (isInForeground) {
-                val d = recManager.recordingTime
-                val text = if (d.toHours() > 0) String.format(Locale.US, "%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
-                else String.format(Locale.US, "%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
-                // проверка разрешений
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(this@RecordingService, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                } else {
-                    notificationManager.notify(notificationId, notificationBuilder.setContentText(getString(R.string.notification_text, text)).build())
-                }
+            /*
+            if (isInForeground) {
+            val d = recManager.recordingTime
+            val text = if (d.toHours() > 0) String.format(Locale.US, "%02d:%02d:%02d", d.toHours(), d.toMinutes() % 60, d.seconds % 60)
+            else String.format(Locale.US, "%02d:%02d", d.toMinutes() % 60, d.seconds % 60)
+            // проверка разрешений
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(this@RecordingService, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            } else {
+                notificationManager.notify(notificationId, notificationBuilder.setContentText(getString(R.string.notification_text, text)).build())
             }
-            */
+        }
+        */
 
             updateRecordingStateHandler.postDelayed(this, 200)
         }
