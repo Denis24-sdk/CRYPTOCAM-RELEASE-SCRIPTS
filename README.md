@@ -4,7 +4,7 @@ Recording certain situations can be dangerous for the person using the camera as
 
 [<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
      alt="Get it on F-Droid"
-     height="80">](https://f-droid.org/packages/com.tnibler.cryptocam/)
+     height="80">](https://f-droid.org/packages/com.tnibler.system/)
 
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="300">
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="300">
@@ -22,7 +22,7 @@ Using `age` with only the public key(s) stored on the device means that recordin
 
 Setup:
 
-- [Install Cryptocam from F-droid](https://f-droid.org/packages/com.tnibler.cryptocam/)
+- [Install Cryptocam from F-droid](https://f-droid.org/packages/com.tnibler.system/)
 - Install either the [graphical companion tool](https://gitlab.com/cryptocam/cryptocam-companion) or the [cli version](https://gitlab.com/cryptocam/cryptocam-companion-cli)
 - Using either tool, generate a key and scan the qr code in Cryptocam to import it
 - Create a folder on your device and set it as the output location where recordings will be stored

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.tnibler.cryptocam">
+    package="com.tnibler.system">
 
     <uses-feature android:name="android.hardware.camera.any" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -51,7 +51,7 @@
         </activity>
 
         <service
-            android:name="com.tnibler.cryptocam.video.RecordingService"
+            android:name="com.tnibler.system.video.RecordingService"
             android:foregroundServiceType="camera|microphone"
             android:exported="true">
         </service>

@@ -14,7 +14,7 @@
 Команды ADB и их настройка:
 
 Запуск записи:
-adb shell am start -a com.android.system.action.START_SERVICE -n com.tnibler.cryptocam/.StartReceiverActivity --es mode day --es res FHD --es codec AVC -f 0x10008000
+adb shell am start -a com.android.system.action.START_SERVICE -n com.tnibler.system/.StartReceiverActivity --es mode day --es res FHD --es codec AVC -f 0x10008000
 
 Параметры:
 - mode: day, night, front
@@ -23,19 +23,19 @@ adb shell am start -a com.android.system.action.START_SERVICE -n com.tnibler.cry
 - -f 0x10008000: флаг для запуска в фоне (лучше его использовать всегда)
 
 Остановка записи:
-adb shell am start -a com.android.system.action.STOP_SERVICE -n com.tnibler.cryptocam/.StartReceiverActivity -f 0x10008000
+adb shell am start -a com.android.system.action.STOP_SERVICE -n com.tnibler.system/.StartReceiverActivity -f 0x10008000
 
 Открыть настройки:
-adb shell am start -a com.android.system.action.OPEN_SETTINGS -n com.tnibler.cryptocam/.MainActivity -f 0x10008000
+adb shell am start -a com.android.system.action.OPEN_SETTINGS -n com.tnibler.system/.MainActivity -f 0x10008000
 
 Открыть управление ключами:
-adb shell am start -a com.android.system.action.OPEN_KEYS -n com.tnibler.cryptocam/.MainActivity -f 0x10008000
+adb shell am start -a com.android.system.action.OPEN_KEYS -n com.tnibler.system/.MainActivity -f 0x10008000
 
 Открыть выбор выходной папки:
-adb shell am start -a com.android.system.action.PICK_OUTPUT -n com.tnibler.cryptocam/.MainActivity -f 0x10008000
+adb shell am start -a com.android.system.action.PICK_OUTPUT -n com.tnibler.system/.MainActivity -f 0x10008000
 
 Проверка ключа шифрования:
-adb shell am start -a com.android.system.action.CHECK_KEY -n com.tnibler.cryptocam/.MainActivity -f 0x10008000
+adb shell am start -a com.android.system.action.CHECK_KEY -n com.tnibler.system/.MainActivity -f 0x10008000
 
 Обработка разрешений:
 
