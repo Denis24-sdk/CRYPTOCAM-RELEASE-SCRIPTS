@@ -21,7 +21,7 @@
     <string name="vibrate_while_recording_summary">Regularly vibrate while recording in the background so you\'ll know if Cryptocam is killed by Android</string>
     <string name="notification_channel_description">Running background tasks</string>
     <string name="notification_channel_name">System Services</string>
-    <string name="notification_text">Active process: %s</string>
+    <string name="notification_text">Recording in progress</string>
     <string name="notification_title">System Service</string>
     <string name="tutorial_website">Cryptocam tutorial site</string>
     <string name="tutorial_website_description">There is a full tutorial available on the Cryptocam website. It will explain how to generate keys, set them up in Cryptocam and how to decrypt videos.</string>
