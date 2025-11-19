@@ -125,7 +125,6 @@ class RecordingService : Service(), LifecycleOwner {
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         resolution = getVideoResolutionFromPrefs()
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
-        orientationEventListener.enable()
         (applicationContext as App).recordingService = this
 
 
@@ -135,7 +134,6 @@ class RecordingService : Service(), LifecycleOwner {
     override fun onDestroy() {
         super.onDestroy()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
-        orientationEventListener.disable()
         (applicationContext as App).recordingService = null
     }
 
@@ -357,7 +355,7 @@ class RecordingService : Service(), LifecycleOwner {
             else -> 10_000_000 // HD и ниже: 10 Mbps
         }
         val builder = VideoStreamCapture.Builder().setVideoFrameRate(params.fps).setCameraSelector(cameraSelector).setTargetResolution(params.resolution)
-            .setBitRate(initialBitRate).setTargetRotation(Surface.ROTATION_90).setIFrameInterval(1).setVideoCodec(finalCodec)
+            .setBitRate(initialBitRate).setTargetRotation(Surface.ROTATION_0).setIFrameInterval(1).setVideoCodec(finalCodec)
         val extender = Camera2Interop.Extender(builder)
         // Устанавливаем диапазоны FPS
         // Для высоких разрешений в NIGHT режиме пробуем разные подходы
@@ -403,7 +401,7 @@ class RecordingService : Service(), LifecycleOwner {
                     .setCameraSelector(cameraSelector)
                     .setTargetResolution(params.resolution)
                     .setBitRate(actualBitRate)
-                    .setTargetRotation(Surface.ROTATION_90)
+                    .setTargetRotation(Surface.ROTATION_0)
                     .setIFrameInterval(1)
                     .setVideoCodec(finalCodec)
                 val correctedExtender = Camera2Interop.Extender(correctedBuilder)
@@ -496,9 +494,12 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
-        val videoInfo = VideoInfo(actualRes.width, actualRes.height, when (lastHandledOrientation) {
-            Orientation.PORTRAIT -> 90; Orientation.LAND_LEFT -> 0; Orientation.LAND_RIGHT -> 180
-        }, 10_000_000)
+        val videoInfo = VideoInfo(
+            actualRes.width,
+            actualRes.height,
+            90,
+            10_000_000
+        )
         val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
 
         val outputFileManager = outputLocationStr?.let { OutputFileManager(it.toUri(), recipients, contentResolver, sharedPreferences, this) }

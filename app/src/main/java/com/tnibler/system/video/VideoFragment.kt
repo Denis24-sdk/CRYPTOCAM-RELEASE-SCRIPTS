@@ -57,6 +57,7 @@ class VideoFragment : Fragment() {
     }
 
     private var currentCamera: SelectedCamera? = null
+        /*
     private val orientationEventListener by lazy {
         object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
@@ -72,6 +73,8 @@ class VideoFragment : Fragment() {
             }
         }
     }
+    */
+
     private var lastHandledOrientation: Orientation? = null
 
     private fun onServiceBound(service: RecordingService) {
@@ -134,7 +137,6 @@ class VideoFragment : Fragment() {
         } else {
             onServiceBound(service!!)
         }
-        orientationEventListener.enable()
     }
 
     private fun onStateChanged(state: RecordingService.State) {
@@ -256,8 +258,6 @@ class VideoFragment : Fragment() {
             }
 
         }
-
-        orientationEventListener.disable()
     }
 
     override fun onDestroyView() {
