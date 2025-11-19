@@ -580,7 +580,17 @@ class RecordingService : Service(), LifecycleOwner {
     // Storage space management
     private fun getAvailableStorageBytes(path: String): Long {
         return try {
-            val stat = StatFs(path)
+            // For SAF URIs or any path that starts with /tree/, use external storage
+            // since we can't directly access the filesystem path for SAF directories
+            val storagePath = if (path.startsWith("/tree/")) {
+                // Use external storage directory for SAF paths
+                android.os.Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                // Use the provided path for regular filesystem paths
+                path
+            }
+
+            val stat = StatFs(storagePath)
             val bytesAvailable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                 stat.availableBytes
             } else {
