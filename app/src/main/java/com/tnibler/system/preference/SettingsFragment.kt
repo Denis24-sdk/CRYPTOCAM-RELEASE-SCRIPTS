@@ -154,6 +154,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
         generalCategory.addPreference(fileNamePreference)
 
 
+        // --- НАСТРОЙКИ УВЕДОМЛЕНИЯ ---
+        val notificationCategory = PreferenceCategory(context).apply {
+            title = "Notification Appearance"
+            summary = "Customize the text shown in the background service notification"
+        }
+        screen.addPreference(notificationCategory)
+
+        notificationCategory.addPreference(EditTextPreference(context).apply {
+            key = PREF_NOTIFICATION_TITLE
+            title = "Notification Title"
+            dialogTitle = "Enter notification title"
+            // По умолчанию берем текст из ресурсов, если настройки нет
+            setDefaultValue(getString(R.string.notification_title))
+            summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+        })
+
+        notificationCategory.addPreference(EditTextPreference(context).apply {
+            key = PREF_NOTIFICATION_TEXT
+            title = "Notification Text"
+            dialogTitle = "Enter notification text"
+            setDefaultValue(getString(R.string.notification_text))
+            summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+        })
+
+
         // --- НАСТРОЙКИ ПОВЕДЕНИЯ ---
         val behaviorCategory = PreferenceCategory(context).apply { title = "Behavior" }
         screen.addPreference(behaviorCategory)
@@ -191,6 +216,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val PREF_VIBRATE_WHILE_RECORDING = "vibrateWhileRecording"
         const val PREF_SELECTED_RECIPIENTS = "selectedX25519Recipients"
         const val PREF_OUTPUT_FILE_NAME = "outputFileName"
+
+        const val PREF_NOTIFICATION_TITLE = "pref_custom_notif_title"
+        const val PREF_NOTIFICATION_TEXT = "pref_custom_notif_text"
 
         const val PREF_VIBRATE_ON_START = "pref_vibrate_on_start"
         const val PREF_VIBRATE_ON_STOP = "pref_vibrate_on_stop"
