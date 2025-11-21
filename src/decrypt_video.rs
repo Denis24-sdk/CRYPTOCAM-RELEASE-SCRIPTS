@@ -43,6 +43,9 @@ struct VideoMetadata {
     audio_channel_count: u32,
     audio_bitrate: u64,
     timestamp: String,
+    // #[serde(default)] означает, что если поля нет в JSON, оно будет None.
+    #[serde(default)]
+    codec: Option<String>,
 }
 
 fn parse_video_metadata(json: &str) -> Result<VideoMetadata> {
@@ -96,12 +99,25 @@ fn mux_video(
     progress_callback: Box<&mut dyn ProgressCallback>,
     cancel: Arc<AtomicBool>,
 ) {
-    let video_params = VideoCodecParameters::builder("h264")
+    // ЛОГИКА ВЫБОРА КОДЕКА
+
+    let codec_name = match metadata.codec.as_deref() {
+        // Если Android написал "hevc" или "h265" - используем HEVC
+        Some(c) if c.eq_ignore_ascii_case("hevc") || c.eq_ignore_ascii_case("h265") => "hevc",
+
+        // Иначе по умолчанию используем H.264 (как было раньше)
+        _ => "h264",
+    };
+
+    println!("Using codec: {}", codec_name); // Для отладки
+
+    let video_params = VideoCodecParameters::builder(codec_name)
         .unwrap()
         .width(metadata.width)
         .height(metadata.height)
         .bit_rate(metadata.video_bitrate)
         .build();
+
     let channel_layout = match ChannelLayout::from_channels(metadata.audio_channel_count as u32) {
         None => {
             progress_callback.on_error(anyhow!("Error getting channel layout").into());
@@ -115,7 +131,7 @@ fn mux_video(
         .bit_rate(metadata.audio_bitrate)
         .sample_rate(metadata.audio_sample_rate)
         .build();
-    let file_name = format!("{}.mp4", metadata.timestamp.replace(":", "-")); // try not tripping up windows with scary filenames
+    let file_name = format!("{}.mp4", metadata.timestamp.replace(":", "-"));
     let output_format = match OutputFormat::guess_from_file_name(&file_name) {
         None => {
             progress_callback.on_error(
@@ -135,12 +151,25 @@ fn mux_video(
     };
     let io = IO::from_seekable_write_stream(out);
     let mut muxer_builder = Muxer::builder().interleaved(true);
-    let video_stream_index = muxer_builder
-        .add_stream(&CodecParameters::from(video_params))
-        .unwrap();
-    let audio_stream_index = muxer_builder
-        .add_stream(&CodecParameters::from(audio_params))
-        .unwrap();
+
+    // Добавляем видео-поток
+    let video_stream_index = match muxer_builder.add_stream(&CodecParameters::from(video_params)) {
+         Ok(idx) => idx,
+         Err(e) => {
+             progress_callback.on_error(anyhow!("Error adding video stream: {}", e).into());
+             return;
+         }
+    };
+
+    // Добавляем аудио-поток
+    let audio_stream_index = match muxer_builder.add_stream(&CodecParameters::from(audio_params)) {
+        Ok(idx) => idx,
+        Err(e) => {
+            progress_callback.on_error(anyhow!("Error adding audio stream: {}", e).into());
+            return;
+        }
+    };
+
     muxer_builder.streams_mut()[video_stream_index].set_metadata("rotate", metadata.rotation);
     let mut muxer = match muxer_builder.build(io, output_format) {
         Err(e) => {
@@ -150,7 +179,6 @@ fn mux_video(
         Ok(m) => m,
     };
 
-    // packet header contains packet type (1B), pts in us (8B), length (4B)
     let mut packet_header: [u8; 13] = [0; 13];
     let mut first_pts: Option<i64> = None;
     let mut progress: u64 = 0;
