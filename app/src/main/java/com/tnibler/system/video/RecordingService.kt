@@ -568,13 +568,24 @@ class RecordingService : Service(), LifecycleOwner {
         // Берем кодек из текущих параметров. Если вдруг null - ставим AVC по умолчанию.
         val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
 
+
+        // Устанавливаем rotation в зависимости от камеры
+        // Задняя камера обычно записывает пиксели повернутыми на 90° вправо
+        // Фронтальная камера обычно записывает пиксели повернутыми на 270° (90° влево)
+        val rotationValue = when (state.value.selectedCamera) {
+            SelectedCamera.BACK -> 90   // Задняя камера
+            SelectedCamera.FRONT -> 270 // Фронтальная камера
+        }
+
         val videoInfo = VideoInfo(
             actualRes.width,
             actualRes.height,
-            90,
+            rotationValue,
             10_000_000,
             codecName
         )
+
+
         val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
 
         val outputFileManager = outputLocationStr?.let { OutputFileManager(it.toUri(), recipients, contentResolver, sharedPreferences, this) }
