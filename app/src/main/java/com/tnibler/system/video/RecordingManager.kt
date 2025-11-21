@@ -104,5 +104,16 @@ class RecordingManager(
     }
 }
 
-data class VideoInfo(val width: Int, val height: Int, val rotation: Int, val bitrate: Int)
-data class AudioInfo(val channelCount: Int, val bitrate: Int, val sampleRate: Int)
+data class VideoInfo(
+    val width: Int,
+    val height: Int,
+    val rotation: Int,
+    val bitrate: Int,
+    val codec: String
+)
+
+data class AudioInfo(
+    val channelCount: Int,
+    val bitrate: Int,
+    val sampleRate: Int
+)

@@ -170,6 +170,10 @@ class OutputFileManager(
         json.put("audio_sample_rate", audioInfo.sampleRate)
         json.put("audio_channel_count", audioInfo.channelCount)
         json.put("audio_bitrate", audioInfo.bitrate)
+
+        // Rust ожидает "hevc" или "h265"
+        json.put("codec", videoInfo.codec)
+
         return json.toString().toByteArray()
     }
 

@@ -564,11 +564,16 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
+
+        // Берем кодек из текущих параметров. Если вдруг null - ставим AVC по умолчанию.
+        val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
+
         val videoInfo = VideoInfo(
             actualRes.width,
             actualRes.height,
             90,
-            10_000_000
+            10_000_000,
+            codecName
         )
         val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
 
