@@ -384,6 +384,10 @@ class RecordingService : Service(), LifecycleOwner {
             .setTargetRotation(Surface.ROTATION_0)
             .setIFrameInterval(1)
             .setVideoCodec(codec)
+            // --- НАСТРОЙКИ АУДИО ДЛЯ WINDOWS ---
+            .setAudioBitRate(256000)
+            .setAudioSampleRate(48000)
+            .setAudioChannelCount(2)
 
         val extender = Camera2Interop.Extender(builder)
 
@@ -466,6 +470,10 @@ class RecordingService : Service(), LifecycleOwner {
                 .setTargetRotation(Surface.ROTATION_0)
                 .setIFrameInterval(1)
                 .setVideoCodec(codec)
+                // --- АУДИО ФИКС ---
+                .setAudioBitRate(256000)
+                .setAudioSampleRate(48000)
+                .setAudioChannelCount(2)
 
             val correctedExtender = Camera2Interop.Extender(correctedBuilder)
 

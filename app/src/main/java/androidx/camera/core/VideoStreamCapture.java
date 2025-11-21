@@ -274,7 +274,7 @@ public class VideoStreamCapture extends UseCase {
         }
 
         try {
-            mVideoEncoder = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE);
+            mVideoEncoder = MediaCodec.createEncoderByType(mVideoCodec);
             mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create MediaCodec due to: " + e.getCause());
@@ -744,13 +744,29 @@ public class VideoStreamCapture extends UseCase {
                     outIndex = mAudioEncoder.dequeueOutputBuffer(mAudioBufferInfo, 0);
                     switch (outIndex) {
                         case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                            synchronized (mMuxerLock) {
-                                // mAudioTrackIndex =
-                                // mMuxer.addTrack(mAudioEncoder.getOutputFormat());
-//                                if (mAudioTrackIndex >= 0 && mVideoTrackIndex >= 0) {
-//                                    mMuxerStarted = true;
-                                // mMuxer.start();
-//                                }
+                            // ПОЛУЧАЕМ НОВЫЙ ФОРМАТ
+                            MediaFormat newFormat = mAudioEncoder.getOutputFormat();
+                            Log.d(TAG, "Audio format changed to: " + newFormat);
+
+                            // Извлекаем конфигурационные данные (CSD-0)
+                            ByteBuffer csd0 = newFormat.getByteBuffer("csd-0");
+
+                            if (csd0 != null && mEncodedBufferHandler != null) {
+                                // Копируем байты
+                                byte[] configBytes = new byte[csd0.remaining()];
+                                csd0.get(configBytes);
+                                csd0.rewind(); // Важно вернуть позицию назад
+
+                                // Отправляем эти данные как "Конфиг".
+                                // ВАЖНО: Вам нужно будет добавить метод setAudioConfig
+                                // в интерфейс EncodedBufferHandler, если его нет,
+                                // ИЛИ отправить это как обычный буфер, но пометить флагом CODEC_CONFIG
+
+                                // Вариант 1 (если есть метод для конфига):
+                                // mEncodedBufferHandler.setAudioConfig(configBytes);
+
+                                // Вариант 2 (если Rust-часть сама разберется, просто шлем как данные):
+                                // Часто CSD нужно отправить перед первым аудио-пакетом.
                             }
                             break;
                         case MediaCodec.INFO_TRY_AGAIN_LATER:
@@ -758,6 +774,7 @@ public class VideoStreamCapture extends UseCase {
                         default:
                             audioEos = writeAudioEncodedBuffer(outIndex);
                     }
+
                 } while (outIndex >= 0 && !audioEos); // end of dequeue output buffer
             }
         } // end of while loop
@@ -807,53 +824,44 @@ public class VideoStreamCapture extends UseCase {
     }
 
     /** Create a AudioRecord object to get raw data */
+    /** Create a AudioRecord object to get raw data */
+    @SuppressLint("MissingPermission") // Добавляем аннотацию, чтобы убрать предупреждение
     private AudioRecord autoConfigAudioRecordSource(VideoStreamCaptureConfig config) {
         for (short audioFormat : sAudioEncoding) {
-
-            // Use channel count to determine stereo vs mono
-            int channelConfig =
-                    mAudioChannelCount == 1
-                            ? AudioFormat.CHANNEL_IN_MONO
-                            : AudioFormat.CHANNEL_IN_STEREO;
+            // ... (код определения каналов) ...
+            int channelConfig = mAudioChannelCount == 1 ? AudioFormat.CHANNEL_IN_MONO : AudioFormat.CHANNEL_IN_STEREO;
             int source = config.getAudioRecordSource();
 
             try {
-                int bufferSize =
-                        AudioRecord.getMinBufferSize(mAudioSampleRate, channelConfig, audioFormat);
-
+                int bufferSize = AudioRecord.getMinBufferSize(mAudioSampleRate, channelConfig, audioFormat);
                 if (bufferSize <= 0) {
                     bufferSize = config.getAudioMinBufferSize();
                 }
 
-                AudioRecord recorder =
-                        new AudioRecord(
-                                source,
-                                mAudioSampleRate,
-                                channelConfig,
-                                audioFormat,
-                                bufferSize * 2);
+                // ВОТ ЗДЕСЬ ИЗМЕНЕНИЕ:
+                // Пытаемся создать рекордер
+                AudioRecord recorder = new AudioRecord(
+                        source,
+                        mAudioSampleRate,
+                        channelConfig,
+                        audioFormat,
+                        bufferSize * 2);
 
+                // Проверяем, инициализировался ли он (если прав нет, state будет UNINITIALIZED)
                 if (recorder.getState() == AudioRecord.STATE_INITIALIZED) {
                     mAudioBufferSize = bufferSize;
-                    Log.i(
-                            TAG,
-                            "source: "
-                                    + source
-                                    + " audioSampleRate: "
-                                    + mAudioSampleRate
-                                    + " channelConfig: "
-                                    + channelConfig
-                                    + " audioFormat: "
-                                    + audioFormat
-                                    + " bufferSize: "
-                                    + bufferSize);
+                    Log.i(TAG, "AudioRecord initialized successfully: " + mAudioSampleRate + "hz");
                     return recorder;
+                } else {
+                    recorder.release(); // Освобождаем, если не удалось
                 }
+            } catch (SecurityException e) {
+                Log.e(TAG, "Permission denied for AudioRecord: " + e.getMessage());
+                // Продолжаем цикл или возвращаем null
             } catch (Exception e) {
-                Log.e(TAG, "Exception, keep trying.", e);
+                Log.e(TAG, "Exception during AudioRecord init", e);
             }
         }
-
         return null;
     }
 
