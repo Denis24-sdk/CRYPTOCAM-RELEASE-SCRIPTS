@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Result};
 use bytes::{ByteOrder, LittleEndian};
 use log::warn;
 use serde::Deserialize;
-use std::{fs::File, io::Read, path::PathBuf, str, sync::atomic::AtomicBool, sync::Arc};
+use std::{fs::File, io::Read, io::Write, path::PathBuf, str, sync::atomic::AtomicBool, sync::Arc};
 
 pub fn build_video_decryption_job(
     data: Box<dyn Read>,
@@ -43,7 +43,6 @@ struct VideoMetadata {
     audio_channel_count: u32,
     audio_bitrate: u64,
     timestamp: String,
-    // #[serde(default)] означает, что если поля нет в JSON, оно будет None.
     #[serde(default)]
     codec: Option<String>,
 }
@@ -99,19 +98,17 @@ fn mux_video(
     progress_callback: Box<&mut dyn ProgressCallback>,
     cancel: Arc<AtomicBool>,
 ) {
-    // ЛОГИКА ВЫБОРА КОДЕКА
+    // --- ОТЛАДКА: Создаем файл debug_log.txt, чтобы убедиться, что данные приходят ---
+    if let Ok(mut file) = File::create("debug_log.txt") {
+        let _ = writeln!(file, "Rotation from Android: {}", metadata.rotation);
+        let _ = writeln!(file, "Codec: {:?}", metadata.codec);
+    }
+    // -------------------------------------------------------------------------------
 
     let codec_name = match metadata.codec.as_deref() {
-        // Если Android написал "hevc" или "h265" - используем HEVC
         Some(c) if c.eq_ignore_ascii_case("hevc") || c.eq_ignore_ascii_case("h265") => "hevc",
-
-        // Иначе по умолчанию используем H.264 (как было раньше)
         _ => "h264",
-
-        // _ => "hevc",
     };
-
-    println!("Using codec: {}", codec_name); // Для отладки
 
     let video_params = VideoCodecParameters::builder(codec_name)
         .unwrap()
@@ -154,7 +151,6 @@ fn mux_video(
     let io = IO::from_seekable_write_stream(out);
     let mut muxer_builder = Muxer::builder().interleaved(true);
 
-    // Добавляем видео-поток
     let video_stream_index = match muxer_builder.add_stream(&CodecParameters::from(video_params)) {
          Ok(idx) => idx,
          Err(e) => {
@@ -163,7 +159,6 @@ fn mux_video(
          }
     };
 
-    // Добавляем аудио-поток
     let audio_stream_index = match muxer_builder.add_stream(&CodecParameters::from(audio_params)) {
         Ok(idx) => idx,
         Err(e) => {
@@ -172,7 +167,15 @@ fn mux_video(
         }
     };
 
-    muxer_builder.streams_mut()[video_stream_index].set_metadata("rotate", metadata.rotation);
+    // ===========================================================================
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ: ПРЕОБРАЗОВАНИЕ В СТРОКУ
+    // ===========================================================================
+    let rotation_string = metadata.rotation.to_string();
+    muxer_builder
+        .streams_mut()[video_stream_index]
+        .set_metadata("rotate", &rotation_string);
+    // ===========================================================================
+
     let mut muxer = match muxer_builder.build(io, output_format) {
         Err(e) => {
             progress_callback.on_error(e.into());
