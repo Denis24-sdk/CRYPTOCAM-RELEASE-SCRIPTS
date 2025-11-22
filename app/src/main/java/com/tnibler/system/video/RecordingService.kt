@@ -569,13 +569,11 @@ class RecordingService : Service(), LifecycleOwner {
         val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
 
 
-        // Устанавливаем rotation в зависимости от камеры
-        // Задняя камера обычно записывает пиксели повернутыми на 90° вправо
-        // Фронтальная камера обычно записывает пиксели повернутыми на 270° (90° влево)
-        val rotationValue = when (state.value.selectedCamera) {
-            SelectedCamera.BACK -> 90   // Задняя камера
-            SelectedCamera.FRONT -> 270 // Фронтальная камера
-        }
+        // Для портретного видео rotation = 90, чтобы плеер повернул landscape данные в портрет
+        val rotationValue = 90
+
+        // Отладка: выводим rotation в лог
+        Log.d(TAG, "Video rotation set to: $rotationValue for camera: ${state.value.selectedCamera}")
 
         val videoInfo = VideoInfo(
             actualRes.width,
