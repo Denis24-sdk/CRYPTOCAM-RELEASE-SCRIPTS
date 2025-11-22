@@ -20,14 +20,7 @@ Item {
             }
         }
         onDropped: {
-            let urls = []
-            for (let i in drop.urls) {
-                urls += drop.urls[i]
-                if (i < drop.urls.length - 1) {
-                    urls += ' '
-                }
-            }
-            cryptocam.addFiles(urls)
+            cryptocam.addFiles(drop.urls.map((u) => u.toString()))
         }
     }
 
