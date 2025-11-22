@@ -49,6 +49,7 @@ import java.util.*
 @ExperimentalCamera2Interop
 class RecordingService : Service(), LifecycleOwner {
     private val TAG = javaClass.simpleName
+    private val HEVC_BITRATE_REDUCTION_PERCENT = 40 // на сколько процентов меньше битрейта у HEVC относительно AVC
     private val sharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private val binder = RecordingServiceBinder()
     private var isBound = false
@@ -380,7 +381,7 @@ class RecordingService : Service(), LifecycleOwner {
 
 
         //  БИТРЕЙТ НАСТРОЙКИ
-        val adjustedBitRate = rawBitRate
+        val adjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) (rawBitRate * (1.0 - HEVC_BITRATE_REDUCTION_PERCENT / 100.0)).toInt() else rawBitRate
 
         Log.d(TAG, "Setup VideoCapture. Codec=$codec, RawBitrate=$rawBitRate, AdjustedBitrate=$adjustedBitRate")
 
@@ -458,7 +459,7 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
 
-        val finalAdjustedBitRate = newRawBitRate
+        val finalAdjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) (newRawBitRate * (1.0 - HEVC_BITRATE_REDUCTION_PERCENT / 100.0)).toInt() else newRawBitRate
 
 
         if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio) && actualRes != null) {
