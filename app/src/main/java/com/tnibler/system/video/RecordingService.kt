@@ -103,19 +103,24 @@ class RecordingService : Service(), LifecycleOwner {
     private fun buildOrientationEventListener(): OrientationEventListener {
         return object : OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
             override fun onOrientationChanged(orientation: Int) {
-                val currentOrientation = when (orientation) {
-                    in 75..134 -> Orientation.LAND_RIGHT; in 224..289 -> Orientation.LAND_LEFT; else -> Orientation.PORTRAIT
+                val newSurfaceRotation = when (orientation) {
+                    in 45..135 -> Surface.ROTATION_270  // Landscape right
+                    in 135..225 -> Surface.ROTATION_180 // Portrait upside down
+                    in 225..315 -> Surface.ROTATION_90  // Landscape left
+                    else -> Surface.ROTATION_0          // Portrait
                 }
-                surfaceRotation = when (currentOrientation) {
-                    Orientation.PORTRAIT -> Surface.ROTATION_0; Orientation.LAND_RIGHT -> Surface.ROTATION_270; Orientation.LAND_LEFT -> Surface.ROTATION_90
-                }
-                if (state.value !is State.Recording && currentOrientation != lastHandledOrientation) {
-                    lastHandledOrientation = currentOrientation
-                    if (videoCapture != null) {
+
+                // Обновляем только если rotation действительно изменился
+                if (newSurfaceRotation != surfaceRotation) {
+                    surfaceRotation = newSurfaceRotation
+                    Log.d(TAG, "Orientation changed: $orientation -> Surface.ROTATION_$surfaceRotation")
+
+                    // Переинициализируем запись только если не записываем и use cases уже инициализированы
+                    if (state.value !is State.Recording && state.value is State.ReadyToRecord) {
+                        Log.d(TAG, "Reinitializing recording with new orientation")
                         initRecording()
                     }
                 }
-                lastHandledOrientation = currentOrientation
             }
         }
     }
@@ -124,14 +129,24 @@ class RecordingService : Service(), LifecycleOwner {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         resolution = getVideoResolutionFromPrefs()
+
+        // Запускаем отслеживание ориентации
+        if (orientationEventListener.canDetectOrientation()) {
+            orientationEventListener.enable()
+            Log.d(TAG, "Orientation listener enabled")
+        } else {
+            Log.w(TAG, "Cannot detect orientation")
+        }
+
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         (applicationContext as App).recordingService = this
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        orientationEventListener.disable()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         (applicationContext as App).recordingService = null
+        super.onDestroy()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -381,7 +396,7 @@ class RecordingService : Service(), LifecycleOwner {
             .setCameraSelector(cameraSelector)
             .setTargetResolution(params.resolution)
             .setBitRate(adjustedBitRate) // Используем скорректированный битрейт
-            .setTargetRotation(Surface.ROTATION_0)
+            .setTargetRotation(surfaceRotation)
             .setIFrameInterval(1)
             .setVideoCodec(codec)
             // --- НАСТРОЙКИ АУДИО ДЛЯ WINDOWS ---
@@ -457,9 +472,9 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
         // --- ЛОГИКА ПЕРЕСОЗДАНИЯ (Rebinding) ---
-        // Сравниваем с adjustedBitRate (текущим), чтобы понять, изменилось ли что-то
+// Сравниваем с adjustedBitRate (текущим), чтобы понять, изменилось ли что-то
         if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio) && actualRes != null) {
-            Log.d(TAG, "Rebinding needed. NewBitrate=$finalAdjustedBitRate (Raw=$newRawBitRate), NewRes=$finalResolution")
+            Log.d(TAG, "Rebinding needed. NewBitrate=$finalAdjustedBitRate (Raw=$newRawBitRate), NewRes=$finalResolution, SurfaceRotation=$surfaceRotation")
             provider.unbind(videoCapture!!)
 
             val correctedBuilder = VideoStreamCapture.Builder()
@@ -467,7 +482,7 @@ class RecordingService : Service(), LifecycleOwner {
                 .setCameraSelector(cameraSelector)
                 .setTargetResolution(finalResolution)
                 .setBitRate(finalAdjustedBitRate) // ВАЖНО: используем сниженный битрейт
-                .setTargetRotation(Surface.ROTATION_0)
+                .setTargetRotation(surfaceRotation)  // ← ИСПРАВЛЕНО: используем текущий surfaceRotation
                 .setIFrameInterval(1)
                 .setVideoCodec(codec)
                 // --- АУДИО ФИКС ---
@@ -494,7 +509,7 @@ class RecordingService : Service(), LifecycleOwner {
             camera = provider.bindToLifecycle(this, cameraSelector, videoCapture!!)
 
             val newRes = videoCapture?.attachedSurfaceResolution
-            Log.d(TAG, "Rebound finish. ActualRes=$newRes")
+            Log.d(TAG, "Rebound finish. ActualRes=$newRes, SurfaceRotation=$surfaceRotation")
         }
 
         camera?.cameraControl?.enableTorch(state.value.flashOn)
@@ -505,6 +520,12 @@ class RecordingService : Service(), LifecycleOwner {
 
     @SuppressLint("RestrictedApi")
     private fun initRecording() {
+        // Проверяем, что videoCapture инициализирован
+        if (videoCapture == null) {
+            Log.w(TAG, "initRecording called but videoCapture is null")
+            return
+        }
+
         val outputLocationStr = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
         val keyManager: KeyManager = (application as App).globalServices.get()
         val recipients = runBlocking { keyManager.selectedRecipients.first() }
@@ -513,25 +534,20 @@ class RecordingService : Service(), LifecycleOwner {
         if (!outputLocationStr.isNullOrEmpty() && recipients.isNotEmpty()) {
             try {
                 val dirUri = outputLocationStr.toUri()
-
                 val hasPersistedPermission = contentResolver.persistedUriPermissions.any {
                     it.uri == dirUri && it.isWritePermission
                 }
-
                 if (hasPersistedPermission) {
                     val docFile = DocumentFile.fromTreeUri(this, dirUri)
                     if (docFile != null && docFile.exists()) {
                         isOutputDirectoryOk = true
-                    } else {
-                        Log.e(TAG, "Directory permission is persisted, but the folder itself does not exist or cannot be accessed.")
                     }
-                } else {
-                    Log.e(TAG, "No persisted write permission found for the saved directory URI.")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error while checking output directory permissions", e)
             }
         }
+
 
         // Если папка не выбрана, недоступна или нет ключей шифрования
         if (!isOutputDirectoryOk || videoCapture == null) {
@@ -554,7 +570,7 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
-        // Check storage space before proceeding
+        // Check storage space
         val outputDirPath = outputLocationStr?.toUri()?.path ?: return
         if (!checkStorageSpaceBeforeRecording(outputDirPath)) {
             Log.e(TAG, "Insufficient storage space for recording")
@@ -564,25 +580,26 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
-
-        // Берем кодек из текущих параметров. Если вдруг null - ставим AVC по умолчанию.
         val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
 
+        // ВАЖНО: Используем surfaceRotation, который обновляется в orientation listener
+        val rotationValue = when (surfaceRotation) {
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
 
-        // Для портретного видео rotation = 90, чтобы плеер повернул landscape данные в портрет
-        val rotationValue = 90
-
-        // Отладка: выводим rotation в лог
-        Log.d(TAG, "Video rotation set to: $rotationValue for camera: ${state.value.selectedCamera}")
+        Log.d(TAG, "Final video rotation set to: $rotationValue for camera: ${state.value.selectedCamera}, surfaceRotation: $surfaceRotation")
 
         val videoInfo = VideoInfo(
             actualRes.width,
             actualRes.height,
-            rotationValue,
+            rotationValue,  // Теперь используем реальное значение из orientation listener
             10_000_000,
             codecName
         )
-
 
         val audioInfo = AudioInfo(videoCapture!!.audioChannelCount, videoCapture!!.audioBitRate, videoCapture!!.audioSampleRate)
 
@@ -602,21 +619,30 @@ class RecordingService : Service(), LifecycleOwner {
                             stopSelf()
                         }
                     }
-                    pendingStartIntent?.let { val intent = it; pendingStartIntent = null; handleStartCommand(intent) }
+                    pendingStartIntent?.let { intent ->
+                        pendingStartIntent = null
+                        handleStartCommand(intent)
+                    }
                 },
                 onRecordingStarted = { vibrateOnStart() },
                 onRecordingStopped = { vibrateOnStop() }
             )
         }
 
-        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) {
-            recordingManager?.setUp()
-            if (state.value is State.NotReadyToRecord) {
-                val currentState = state.value as State.NotReadyToRecord
-                _state.value = State.ReadyToRecord(resolution, surfaceRotation, currentState.selectedCamera, currentState.flashOn)
-                if (startRecordingAction) { startRecordingAction = false; delay(400); startRecording() }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                recordingManager?.setUp()
+                if (state.value is State.NotReadyToRecord) {
+                    val currentState = state.value as State.NotReadyToRecord
+                    _state.value = State.ReadyToRecord(resolution, surfaceRotation, currentState.selectedCamera, currentState.flashOn)
+                    if (startRecordingAction) {
+                        startRecordingAction = false
+                        delay(400)
+                        startRecording()
+                    }
+                }
             }
-        }}
+        }
     }
 
     private val updateRecordingStateHandler = Handler(Looper.getMainLooper())

@@ -57,24 +57,8 @@ class VideoFragment : Fragment() {
     }
 
     private var currentCamera: SelectedCamera? = null
-        /*
-    private val orientationEventListener by lazy {
-        object : OrientationEventListener(requireContext(), SensorManager.SENSOR_DELAY_NORMAL) {
-            override fun onOrientationChanged(orientation: Int) {
-                val currentOrientation = when (orientation) {
-                    in 75..134 -> Orientation.LAND_RIGHT
-                    in 224..289 -> Orientation.LAND_LEFT
-                    else -> Orientation.PORTRAIT
-                }
-                if (currentOrientation != lastHandledOrientation) {
-                    rotateUiTo(currentOrientation)
-                }
-                lastHandledOrientation = currentOrientation
-            }
-        }
-    }
-    */
 
+    // Удаляем ориентационный listener из фрагмента - он теперь в сервисе
     private var lastHandledOrientation: Orientation? = null
 
     private fun onServiceBound(service: RecordingService) {
@@ -250,13 +234,11 @@ class VideoFragment : Fragment() {
         preview = null
 
         if (currentService != null) {
-
             try {
                 requireContext().unbindService(connection)
             } catch (e: IllegalArgumentException) {
                 Log.w(TAG, "Service was not registered to be unbound.")
             }
-
         }
     }
 
@@ -266,18 +248,16 @@ class VideoFragment : Fragment() {
         binding = null
     }
 
+    // Упрощенная функция rotateUiTo - удаляем или оставляем базовую логику
     private fun rotateUiTo(currentOrientation: Orientation) {
         val degrees = when (currentOrientation) {
-            Orientation.LAND_LEFT -> 90
-            Orientation.LAND_RIGHT -> -90
-            Orientation.PORTRAIT -> 0
-        }.toFloat()
-
-        binding?.overlayText?.rotation = when (currentOrientation) {
-            Orientation.LAND_RIGHT -> -90f
             Orientation.LAND_LEFT -> 90f
+            Orientation.LAND_RIGHT -> -90f
             Orientation.PORTRAIT -> 0f
+            Orientation.PORTRAIT_UPSIDE_DOWN -> 180f // Добавляем недостающую ветку
         }
+
+        binding?.overlayText?.rotation = degrees
         binding?.run {
             listOf(btnFlash, btnRecordVideo, btnSettings, btnToggleCamera, dotRecording, layoutRecordingTime)
                 .forEach { v -> v.animate().rotation(degrees).start() }
