@@ -188,7 +188,7 @@ class RecordingService : Service(), LifecycleOwner {
             "HD" -> Size(1280, 720); "FHD" -> Size(1920, 1080); "2K" -> Size(2560, 1440); "4K" -> Size(3840, 2160); else -> Size(1920, 1080)
         }
 
-        // настройки для высоких разрешений
+
         if (resolution.width >= 2560) {
             // Отключаем OIS для высоких разрешений
             if (oisEnabled) {
@@ -208,7 +208,7 @@ class RecordingService : Service(), LifecycleOwner {
     private fun isHevcSupported(): Boolean {
         try {
             val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-            // Ищем любой энкодер, который поддерживает HEVC (H.265)
+            // Ищем любой энкодер, который поддерживает HEVC
             for (info in list.codecInfos) {
                 if (!info.isEncoder) continue
                 try {
@@ -227,15 +227,10 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun handleStopCommand() {
-        // 1. ВАЖНО: Всегда вызываем foreground().
-        // Если сервис был перезапущен этой командой, система требует уведомление,
-        // иначе приложение упадет с ошибкой (ForegroundServiceDidNotStartInTimeException).
         foreground()
 
-        // 2. Если запись уже не идет (или сервис только проснулся)
         if (state.value !is State.Recording) {
             Log.d(TAG, "Stop command received, but recording is not active. Stopping service.")
-            // Просто убиваем сервис, так как работы для него нет
             stopSelf()
             return
         }
@@ -257,7 +252,7 @@ class RecordingService : Service(), LifecycleOwner {
         if (state.value is State.Recording) {
             recordingManager?.recordButtonClicked()
             updateRecordingStateHandler.removeCallbacks(updateRecordingStateRunnable)
-            vibrationCounter = 0 // Reset vibration counter when stopping recording
+            vibrationCounter = 0
             val currentState = state.value as State.Recording
             _state.value = State.ReadyToRecord(currentState.resolution, currentState.surfaceRotation, currentState.selectedCamera, currentState.flashOn)
         }
@@ -323,7 +318,7 @@ class RecordingService : Service(), LifecycleOwner {
         localCameraProvider.unbindAll()
         val params = currentParams ?: return
 
-        // 1. Выбор камеры
+        // Выбор камеры
         val customCameraId = sharedPreferences.getString(when (params.mode) {
             ApiConstants.MODE_DAY -> SettingsFragment.PREF_CAMERA_ID_DAY
             ApiConstants.MODE_NIGHT -> SettingsFragment.PREF_CAMERA_ID_NIGHT
@@ -341,7 +336,7 @@ class RecordingService : Service(), LifecycleOwner {
         }
         cameraSelector = cameraSelectorBuilder.build()
 
-        // 2. Определяем кодек
+        // Определяем кодек
         val hevcExists = isHevcSupported()
         val userWantsHevc = params.codec.equals(ApiConstants.CODEC_HEVC, true)
 
@@ -356,7 +351,7 @@ class RecordingService : Service(), LifecycleOwner {
 
         Log.d(TAG, "Attempting init with codec: $targetCodec (UserWants=$userWantsHevc, Hardware=$hevcExists)")
 
-        // 3. Попытка запуска с Fallback
+        // Попытка запуска с Fallback
         try {
             setupVideoCapture(localCameraProvider, targetCodec, initialBitRate)
         } catch (e: Exception) {
@@ -373,7 +368,6 @@ class RecordingService : Service(), LifecycleOwner {
         }
     }
 
-    // Вынесенная логика настройки VideoCapture
     @SuppressLint("RestrictedApi")
     private fun setupVideoCapture(provider: ProcessCameraProvider, codec: String, rawBitRate: Int) {
         val params = currentParams ?: return
@@ -385,9 +379,7 @@ class RecordingService : Service(), LifecycleOwner {
         }
 
 
-        // --- БИТРЕЙТ НАСТРОЙКИ ---
-        // Используем полные битрейты для обоих кодеков (AVC и HEVC)
-        // для достижения максимальной четкости видео
+        //  БИТРЕЙТ НАСТРОЙКИ
         val adjustedBitRate = rawBitRate
 
         Log.d(TAG, "Setup VideoCapture. Codec=$codec, RawBitrate=$rawBitRate, AdjustedBitrate=$adjustedBitRate")
@@ -396,11 +388,11 @@ class RecordingService : Service(), LifecycleOwner {
             .setVideoFrameRate(params.fps)
             .setCameraSelector(cameraSelector)
             .setTargetResolution(portraitResolution)
-            .setBitRate(adjustedBitRate) // Используем скорректированный битрейт
+            .setBitRate(adjustedBitRate)
             .setTargetRotation(Surface.ROTATION_0)
             .setIFrameInterval(1)
             .setVideoCodec(codec)
-            // --- НАСТРОЙКИ АУДИО ДЛЯ WINDOWS ---
+            //  АУДИО ДЛЯ WINDOWS
             .setAudioBitRate(256000)
             .setAudioSampleRate(48000)
             .setAudioChannelCount(2)
@@ -432,7 +424,7 @@ class RecordingService : Service(), LifecycleOwner {
         val actualRes = videoCapture?.attachedSurfaceResolution
         Log.d(TAG, "SUCCESS bind: Codec=$codec, ReqRes=${params.resolution}, ActualRes=$actualRes")
 
-        // --- ПРОВЕРКА СООТНОШЕНИЯ СТОРОН ---
+        // ПРОВЕРКА СООТНОШЕНИЯ СТОРОН
         val w = actualRes?.width?.toFloat() ?: 0f
         val h = actualRes?.height?.toFloat() ?: 1f
         val ratio = if (w > h) w / h else h / w
@@ -441,7 +433,7 @@ class RecordingService : Service(), LifecycleOwner {
 
         var finalResolution = params.resolution
 
-        // Базовый расчет битрейта (высокий, для AVC)
+
         var newRawBitRate = rawBitRate
 
         if (isBadAspectRatio) {
@@ -465,11 +457,10 @@ class RecordingService : Service(), LifecycleOwner {
             }
         }
 
-        // Снова применяем логику HEVC для нового битрейта
+
         val finalAdjustedBitRate = newRawBitRate
 
-        // --- ЛОГИКА ПЕРЕСОЗДАНИЯ (Rebinding) ---
-// Сравниваем с adjustedBitRate (текущим), чтобы понять, изменилось ли что-то
+
         if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio) && actualRes != null) {
             Log.d(TAG, "Rebinding needed. NewBitrate=$finalAdjustedBitRate (Raw=$newRawBitRate), NewRes=$finalResolution, SurfaceRotation=$surfaceRotation")
             provider.unbind(videoCapture!!)
@@ -478,11 +469,10 @@ class RecordingService : Service(), LifecycleOwner {
                 .setVideoFrameRate(params.fps)
                 .setCameraSelector(cameraSelector)
                 .setTargetResolution(finalResolution)
-                .setBitRate(finalAdjustedBitRate) // ВАЖНО: используем сниженный битрейт
+                .setBitRate(finalAdjustedBitRate)
                 .setTargetRotation(Surface.ROTATION_0)
                 .setIFrameInterval(1)
                 .setVideoCodec(codec)
-                // --- АУДИО ФИКС ---
                 .setAudioBitRate(256000)
                 .setAudioSampleRate(48000)
                 .setAudioChannelCount(2)
@@ -517,7 +507,6 @@ class RecordingService : Service(), LifecycleOwner {
 
     @SuppressLint("RestrictedApi")
     private fun initRecording() {
-        // Проверяем, что videoCapture инициализирован
         if (videoCapture == null) {
             Log.w(TAG, "initRecording called but videoCapture is null")
             return
@@ -567,7 +556,7 @@ class RecordingService : Service(), LifecycleOwner {
             return
         }
 
-        // Check storage space
+
         val outputDirPath = outputLocationStr?.toUri()?.path ?: return
         if (!checkStorageSpaceBeforeRecording(outputDirPath)) {
             Log.e(TAG, "Insufficient storage space for recording")
@@ -579,7 +568,7 @@ class RecordingService : Service(), LifecycleOwner {
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
         val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
 
-        // Для портретного режима устанавливаем rotation = 0
+
         val rotationValue = 0
 
         Log.d(TAG, "Final video rotation set to: $rotationValue for camera: ${state.value.selectedCamera}, surfaceRotation: $surfaceRotation")
@@ -587,7 +576,7 @@ class RecordingService : Service(), LifecycleOwner {
         val videoInfo = VideoInfo(
             actualRes.width,
             actualRes.height,
-            rotationValue,  // Теперь используем реальное значение из orientation listener
+            rotationValue,
             10_000_000,
             codecName
         )
@@ -643,14 +632,13 @@ class RecordingService : Service(), LifecycleOwner {
             val recManager = recordingManager ?: return
             if (state.value is State.Recording) {
                 _state.value = (state.value as State.Recording).copy(recordingTime = recManager.recordingTime)
-                // Vibrate every 5 seconds (25 * 200ms = 5 seconds)
                 vibrationCounter++
                 if (vibrationCounter >= 25) {
                     vibrateWhileRecording()
                     vibrationCounter = 0
                 }
 
-                // Check storage space during recording
+                
                 val outputLocationStr = sharedPreferences.getString(SettingsFragment.PREF_OUTPUT_DIRECTORY, null)
                 val outputDirPath = outputLocationStr?.toUri()?.path
                 if (outputDirPath != null && !checkStorageSpaceDuringRecording(outputDirPath)) {

@@ -17,7 +17,6 @@ fun notificationBuilder(context: Context): NotificationCompat.Builder {
 
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
 
-    // 1. Получаем тексты
     val customTitle = prefs.getString(
         SettingsFragment.PREF_NOTIFICATION_TITLE,
         context.getString(R.string.notification_title)
@@ -31,28 +30,26 @@ fun notificationBuilder(context: Context): NotificationCompat.Builder {
     val iconType = prefs.getString(SettingsFragment.PREF_NOTIFICATION_ICON, "info")
 
     val iconResId = when (iconType) {
-        // Базовые
+
         "alert"    -> android.R.drawable.ic_dialog_alert
         "email"    -> android.R.drawable.ic_dialog_email
         "info"     -> android.R.drawable.ic_dialog_info
 
-        // Системные процессы
-        "cloud"    -> android.R.drawable.ic_menu_upload       // Выглядит как стрелка вверх/облако
-        "lock"     -> android.R.drawable.ic_lock_lock         // Замок (если доступен) или ic_secure
+
+        "cloud"    -> android.R.drawable.ic_menu_upload
+        "lock"     -> android.R.drawable.ic_lock_lock
         "settings" -> android.R.drawable.ic_menu_preferences
-        "save"     -> android.R.drawable.ic_menu_save         // Дискета
-        "search"   -> android.R.drawable.ic_menu_search       // Лупа
+        "save"     -> android.R.drawable.ic_menu_save
+        "search"   -> android.R.drawable.ic_menu_search
 
-        // Другие
+
         "map"      -> android.R.drawable.ic_dialog_map
-        "call"     -> android.R.drawable.ic_menu_call         // Телефонная трубка
-        "camera"   -> android.R.drawable.ic_menu_camera       // Камера
-        "play"     -> android.R.drawable.ic_media_play        // Треугольник Play
+        "call"     -> android.R.drawable.ic_menu_call
+        "camera"   -> android.R.drawable.ic_menu_camera
+        "play"     -> android.R.drawable.ic_media_play
 
-        // Fallback (на всякий случай)
+        // Fallback
         else -> {
-            // Если вдруг ic_lock_lock недоступен на некоторых версиях Android,
-            // вернем безопасный вариант для lock, иначе дефолт
             if (iconType == "lock") android.R.drawable.ic_secure else android.R.drawable.ic_dialog_info
         }
     }
@@ -66,7 +63,7 @@ fun notificationBuilder(context: Context): NotificationCompat.Builder {
     return NotificationCompat.Builder(context, App.CHANNEL_ID)
         .setContentTitle(customTitle)
         .setContentText(customText)
-        .setSmallIcon(iconResId) // <-- Используем выбранную иконку
+        .setSmallIcon(iconResId)
         .setContentIntent(pendingIntent)
         .setOngoing(true)
         .setLocalOnly(true)

@@ -16,7 +16,6 @@ class CameraIdSettingsFragment : PreferenceFragmentCompat() {
             title = "Day Mode Camera ID"
             summary = "ID of the camera for 'day' mode (e.g., wide-angle)"
             dialogTitle = "Enter Camera ID"
-            // Устанавливаем, что вводить можно только цифры
             setOnBindEditTextListener { editText ->
                 editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             }
