@@ -378,6 +378,13 @@ class RecordingService : Service(), LifecycleOwner {
     private fun setupVideoCapture(provider: ProcessCameraProvider, codec: String, rawBitRate: Int) {
         val params = currentParams ?: return
 
+        val portraitResolution = if (params.resolution.width > params.resolution.height) {
+            Size(params.resolution.height, params.resolution.width)
+        } else {
+            params.resolution
+        }
+
+
         // --- БИТРЕЙТ НАСТРОЙКИ ---
         // Используем полные битрейты для обоих кодеков (AVC и HEVC)
         // для достижения максимальной четкости видео
@@ -388,9 +395,9 @@ class RecordingService : Service(), LifecycleOwner {
         val builder = VideoStreamCapture.Builder()
             .setVideoFrameRate(params.fps)
             .setCameraSelector(cameraSelector)
-            .setTargetResolution(params.resolution)
+            .setTargetResolution(portraitResolution)
             .setBitRate(adjustedBitRate) // Используем скорректированный битрейт
-            .setTargetRotation(Surface.ROTATION_90)
+            .setTargetRotation(Surface.ROTATION_0)
             .setIFrameInterval(1)
             .setVideoCodec(codec)
             // --- НАСТРОЙКИ АУДИО ДЛЯ WINDOWS ---
@@ -472,7 +479,7 @@ class RecordingService : Service(), LifecycleOwner {
                 .setCameraSelector(cameraSelector)
                 .setTargetResolution(finalResolution)
                 .setBitRate(finalAdjustedBitRate) // ВАЖНО: используем сниженный битрейт
-                .setTargetRotation(Surface.ROTATION_90)
+                .setTargetRotation(Surface.ROTATION_0)
                 .setIFrameInterval(1)
                 .setVideoCodec(codec)
                 // --- АУДИО ФИКС ---
