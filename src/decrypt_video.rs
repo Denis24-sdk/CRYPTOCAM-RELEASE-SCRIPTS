@@ -102,20 +102,39 @@ fn mux_video(
     if let Ok(mut file) = File::create("debug_log.txt") {
         let _ = writeln!(file, "Rotation from Android: {}", metadata.rotation);
         let _ = writeln!(file, "Codec: {:?}", metadata.codec);
+        let _ = writeln!(file, "Original Width: {}, Height: {}", metadata.width, metadata.height);
     }
     // -------------------------------------------------------------------------------
+
+    // Если rotation = 90 или 270, меняем ширину и высоту местами для правильной ориентации
+    let (width, height) = if metadata.rotation == 90 || metadata.rotation == 270 {
+        (metadata.height, metadata.width)
+    } else {
+        (metadata.width, metadata.height)
+    };
+
+    if let Ok(mut file) = File::open("debug_log.txt").and_then(|f| Ok((f, File::create("debug_log.txt")?))) {
+        let _ = writeln!(file.1, "Adjusted Width: {}, Height: {}", width, height);
+    }
 
     let codec_name = match metadata.codec.as_deref() {
         Some(c) if c.eq_ignore_ascii_case("hevc") || c.eq_ignore_ascii_case("h265") => "hevc",
         _ => "h264",
     };
 
-    let video_params = VideoCodecParameters::builder(codec_name)
-        .unwrap()
-        .width(metadata.width)
-        .height(metadata.height)
-        .bit_rate(metadata.video_bitrate)
-        .build();
+    let mut video_params_builder = VideoCodecParameters::builder(codec_name)
+            .unwrap()
+            .width(width)
+            .height(height)
+            .bit_rate(metadata.video_bitrate);
+
+    // Устанавливаем codec_tag для правильного распознавания плеерами
+    let video_params = if codec_name == "hevc" {
+        video_params_builder.codec_tag(0x68766331).build() // 'hvc1'
+    } else {
+        video_params_builder.codec_tag(0x61766331).build() // 'avc1'
+    };
+
 
     let channel_layout = match ChannelLayout::from_channels(metadata.audio_channel_count as u32) {
         None => {
@@ -149,15 +168,15 @@ fn mux_video(
         Ok(f) => f,
     };
     let io = IO::from_seekable_write_stream(out);
+
     let mut muxer_builder = Muxer::builder().interleaved(true);
 
-    let video_stream_index = match muxer_builder.add_stream(&CodecParameters::from(video_params)) {
+    // Добавляем стрим
+    let video_stream_index = match muxer_builder.add_stream(&CodecParameters::from(video_params.clone())) {
          Ok(idx) => idx,
-         Err(e) => {
-             progress_callback.on_error(anyhow!("Error adding video stream: {}", e).into());
-             return;
-         }
+         Err(e) => { /* ... */ return; }
     };
+
 
     let audio_stream_index = match muxer_builder.add_stream(&CodecParameters::from(audio_params)) {
         Ok(idx) => idx,
@@ -167,14 +186,19 @@ fn mux_video(
         }
     };
 
-    // ===========================================================================
-    // ВАЖНОЕ ИСПРАВЛЕНИЕ: ПРЕОБРАЗОВАНИЕ В СТРОКУ
-    // ===========================================================================
-    let rotation_string = metadata.rotation.to_string();
-    muxer_builder
-        .streams_mut()[video_stream_index]
-        .set_metadata("rotate", &rotation_string);
-    // ===========================================================================
+
+
+    let rotation_value = format!("{}", metadata.rotation);
+
+    // Устанавливаем metadata для rotation
+    muxer_builder.streams_mut()[video_stream_index]
+        .set_metadata("rotate", &rotation_value);
+
+
+
+
+
+
 
     let mut muxer = match muxer_builder.build(io, output_format) {
         Err(e) => {
