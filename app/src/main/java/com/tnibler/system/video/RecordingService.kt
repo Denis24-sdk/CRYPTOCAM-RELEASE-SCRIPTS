@@ -390,7 +390,7 @@ class RecordingService : Service(), LifecycleOwner {
             .setCameraSelector(cameraSelector)
             .setTargetResolution(params.resolution)
             .setBitRate(adjustedBitRate) // Используем скорректированный битрейт
-            .setTargetRotation(surfaceRotation)
+            .setTargetRotation(Surface.ROTATION_90)
             .setIFrameInterval(1)
             .setVideoCodec(codec)
             // --- НАСТРОЙКИ АУДИО ДЛЯ WINDOWS ---
@@ -472,7 +472,7 @@ class RecordingService : Service(), LifecycleOwner {
                 .setCameraSelector(cameraSelector)
                 .setTargetResolution(finalResolution)
                 .setBitRate(finalAdjustedBitRate) // ВАЖНО: используем сниженный битрейт
-                .setTargetRotation(surfaceRotation)  // ← ИСПРАВЛЕНО: используем текущий surfaceRotation
+                .setTargetRotation(Surface.ROTATION_90)
                 .setIFrameInterval(1)
                 .setVideoCodec(codec)
                 // --- АУДИО ФИКС ---
@@ -572,14 +572,8 @@ class RecordingService : Service(), LifecycleOwner {
         val actualRes = videoCapture!!.attachedSurfaceResolution ?: return
         val codecName = currentParams?.codec ?: ApiConstants.CODEC_AVC
 
-        // ВАЖНО: Используем surfaceRotation, который обновляется в orientation listener
-        val rotationValue = when (surfaceRotation) {
-            Surface.ROTATION_0 -> 0
-            Surface.ROTATION_90 -> 90
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_270 -> 270
-            else -> 0
-        }
+        // Для портретного режима устанавливаем rotation = 0
+        val rotationValue = 0
 
         Log.d(TAG, "Final video rotation set to: $rotationValue for camera: ${state.value.selectedCamera}, surfaceRotation: $surfaceRotation")
 
