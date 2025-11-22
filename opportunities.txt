@@ -141,6 +141,26 @@ val initialBitRate = when {
 - Для **AVC (H.264)**: можно использовать на 20-30% меньше битрейт чем для HEVC
 - Для **HEVC (H.265)**: эффективнее сжимает, можно снизить битрейт для того же качества
 
+### Настройка соотношения битрейта HEVC к AVC:
+
+По умолчанию битрейт для HEVC уменьшен на 40% относительно битрейта для AVC. Это сделано для оптимизации размера файлов при сохранении хорошего качества.
+
+**Как изменить процент уменьшения битрейта HEVC:**
+
+1. Откройте файл `app/src/main/java/com/tnibler/system/video/RecordingService.kt`
+2. Найдите переменную `HEVC_BITRATE_REDUCTION_PERCENT` (примерно строка 30)
+3. Измените значение (по умолчанию 40):
+
+
+private val HEVC_BITRATE_REDUCTION_PERCENT = 40  // Измените на нужное значение
+
+
+**Примеры:**
+- `HEVC_BITRATE_REDUCTION_PERCENT = 0` - HEVC использует тот же битрейт, что и AVC
+- `HEVC_BITRATE_REDUCTION_PERCENT = 20` - HEVC использует 80% от битрейта AVC
+- `HEVC_BITRATE_REDUCTION_PERCENT = 50` - HEVC использует 50% от битрейта AVC
+
+
 ### Аудио битрейт:
 
 Аудио битрейт фиксирован на 256 Кбит/с (2 канала, 48 кГц). Изменить можно в том же файле:
@@ -149,5 +169,3 @@ val initialBitRate = when {
 .setAudioBitRate(256000)  // 256 Кбит/с
 .setAudioSampleRate(48000) // 48 кГц
 .setAudioChannelCount(2)   // Стерео
-
-
