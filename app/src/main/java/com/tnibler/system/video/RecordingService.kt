@@ -348,10 +348,10 @@ class RecordingService : Service(), LifecycleOwner {
         var targetCodec = if (userWantsHevc && hevcExists) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
 
         val initialBitRate = when {
-            params.resolution.width >= 3840 -> 50_000_000
-            params.resolution.width >= 2560 -> 30_000_000
-            params.resolution.width >= 1920 -> 20_000_000
-            else -> 10_000_000
+            params.resolution.width >= 3840 -> 60_000_000
+            params.resolution.width >= 2560 -> 40_000_000
+            params.resolution.width >= 1920 -> 25_000_000
+            else -> 15_000_000
         }
 
         Log.d(TAG, "Attempting init with codec: $targetCodec (UserWants=$userWantsHevc, Hardware=$hevcExists)")
@@ -378,16 +378,10 @@ class RecordingService : Service(), LifecycleOwner {
     private fun setupVideoCapture(provider: ProcessCameraProvider, codec: String, rawBitRate: Int) {
         val params = currentParams ?: return
 
-        // --- ИСПРАВЛЕНИЕ HEVC ---
-        // HEVC намного эффективнее. Если мы подаем ему тот же битрейт, что и для AVC (например 50Мбит),
-        // мобильный энкодер может отказать (так как это требует слишком высокого Profile Level)
-        // и молча переключиться на AVC.
-        // Поэтому для HEVC мы снижаем битрейт. Качество визуально будет таким же.
-        val adjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
-            rawBitRate / 2
-        } else {
-            rawBitRate
-        }
+        // --- БИТРЕЙТ НАСТРОЙКИ ---
+        // Используем полные битрейты для обоих кодеков (AVC и HEVC)
+        // для достижения максимальной четкости видео
+        val adjustedBitRate = rawBitRate
 
         Log.d(TAG, "Setup VideoCapture. Codec=$codec, RawBitrate=$rawBitRate, AdjustedBitrate=$adjustedBitRate")
 
@@ -450,26 +444,22 @@ class RecordingService : Service(), LifecycleOwner {
             finalResolution = Size(minDim, maxDim)
 
             newRawBitRate = when {
-                maxDim >= 3840 -> 50_000_000
-                maxDim >= 2560 -> 30_000_000
-                maxDim >= 1920 -> 20_000_000
-                else -> 10_000_000
+                maxDim >= 3840 -> 60_000_000
+                maxDim >= 2560 -> 40_000_000
+                maxDim >= 1920 -> 25_000_000
+                else -> 15_000_000
             }
         } else {
             newRawBitRate = when {
-                actualRes?.width ?: 0 >= 3840 -> 50_000_000
-                actualRes?.width ?: 0 >= 2560 -> 30_000_000
-                actualRes?.width ?: 0 >= 1920 -> 20_000_000
-                else -> 10_000_000
+                actualRes?.width ?: 0 >= 3840 -> 60_000_000
+                actualRes?.width ?: 0 >= 2560 -> 40_000_000
+                actualRes?.width ?: 0 >= 1920 -> 25_000_000
+                else -> 15_000_000
             }
         }
 
         // Снова применяем логику HEVC для нового битрейта
-        val finalAdjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
-            newRawBitRate / 2
-        } else {
-            newRawBitRate
-        }
+        val finalAdjustedBitRate = newRawBitRate
 
         // --- ЛОГИКА ПЕРЕСОЗДАНИЯ (Rebinding) ---
 // Сравниваем с adjustedBitRate (текущим), чтобы понять, изменилось ли что-то
