@@ -456,10 +456,10 @@ class RecordingService : Service(), LifecycleOwner {
 
         val isBadAspectRatio = ratio < 1.5
 
-        // ПРОВЕРКА РАЗРЕШЕНИЯ: если запрошено 4K/2K но получено низкое разрешение, fallback на FHD
+        // ПРОВЕРКА РАЗРЕШЕНИЯ: если запрошено 4K/2K но камера не поддерживает такое разрешение, fallback на FHD
         val requestedMaxDim = Math.max(params.resolution.width, params.resolution.height)
         val actualMaxDim = Math.max(actualRes?.width ?: 0, actualRes?.height ?: 0)
-        val isLowResolution = (requestedMaxDim >= 2560 && actualMaxDim < 1920) // 4K/2K requested but got less than FHD
+        val isLowResolution = (requestedMaxDim >= 2560 && actualMaxDim < requestedMaxDim) // 4K/2K requested but camera doesn't support exact resolution
 
         var finalResolution = params.resolution
         var newRawBitRate = rawBitRate
