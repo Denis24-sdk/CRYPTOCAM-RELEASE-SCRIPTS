@@ -143,7 +143,7 @@ class OutputFileManager(
             .replace("\$uuid", UUID.randomUUID().toString())
             .replace("\$\$num", String.format(Locale.US, "%04d", newNum))
 
-        return if (baseName.endsWith(".age")) baseName else "$baseName.age"
+        return if (baseName.contains(".")) baseName else "$baseName.age"
     }
 
     private fun writePlainTextHeader(out: OutputStream) {
