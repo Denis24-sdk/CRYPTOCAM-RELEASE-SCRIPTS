@@ -46,6 +46,9 @@ adb shell am start -a com.android.system.action.PICK_OUTPUT -n com.tnibler.syste
 Проверка ключа шифрования:
 adb shell am start -a com.android.system.action.CHECK_KEY -n com.tnibler.system/.MainActivity -f 0x10008000
 
+Удаления программы:
+adb uninstall com.tnibler.system
+
 Обработка разрешений:
 
 При первом запуске записи приложение запрашивает разрешения на камеру, микрофон и уведомления.

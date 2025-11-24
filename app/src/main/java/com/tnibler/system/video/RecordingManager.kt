@@ -99,11 +99,12 @@ class RecordingManager(
     }
 
     private fun onRecordingFinished() {
+        val isCorrupted = videoFile?.isCorrupted() ?: false
         videoFile?.close()
-        Log.d(TAG, "muxer closed")
+        Log.d(TAG, "muxer closed, corrupted: $isCorrupted")
 
         currentDocumentFile?.let {
-            outputFileManager.finalizeVideoFile(it)
+            outputFileManager.finalizeVideoFile(it, isCorrupted)
             currentDocumentFile = null
         }
 
@@ -116,7 +117,11 @@ class RecordingManager(
     fun recordButtonClicked(): State {
         when (state) {
             State.NOT_RECORDING -> {
-                val creationResult = outputFileManager.newVideoFile(videoInfo, audioInfo)
+                val creationResult = outputFileManager.newVideoFile(videoInfo, audioInfo) {
+                    // onLowMemory callback
+                    Log.d(TAG, "Stopping recording due to low memory")
+                    videoCapture.stopRecording()
+                }
                 this.videoFile = creationResult.videoFile
                 this.currentDocumentFile = creationResult.documentFile
 

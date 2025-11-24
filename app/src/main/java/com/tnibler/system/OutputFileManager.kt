@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Environment
+import android.os.StatFs
 import android.util.Log
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
@@ -34,7 +36,7 @@ class OutputFileManager(
 
     data class VideoFileCreationResult(val videoFile: VideoFile, val documentFile: DocumentFile)
 
-    fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo): VideoFileCreationResult {
+    fun newVideoFile(videoInfo: VideoInfo, audioInfo: AudioInfo, onLowMemory: (() -> Unit)? = null): VideoFileCreationResult {
         val out = DocumentFile.fromTreeUri(context, outputLocation)
             ?: throw RuntimeException("Error opening output directory")
 
@@ -63,21 +65,34 @@ class OutputFileManager(
         writeHeader(ef, metadata.size, FileType.VIDEO)
         ef.write(metadata)
 
-        return VideoFileCreationResult(VideoFile(ef), outFile)
+        return VideoFileCreationResult(VideoFile(ef, onLowMemory), outFile)
     }
 
-    fun finalizeVideoFile(tempFile: DocumentFile) {
+    fun finalizeVideoFile(tempFile: DocumentFile, isCorrupted: Boolean = false) {
         val tempName = tempFile.name ?: return
         if (tempName.startsWith(BUSY_PREFIX)) {
-            val finalName = tempName.removePrefix(BUSY_PREFIX)
-            try {
-                if (tempFile.renameTo(finalName)) {
-                    Log.d(TAG, "File successfully renamed to $finalName")
-                } else {
-                    Log.e(TAG, "Failed to rename file from $tempName to $finalName")
+            if (isCorrupted) {
+                // Delete corrupted file instead of finalizing
+                try {
+                    if (tempFile.delete()) {
+                        Log.w(TAG, "Deleted corrupted temporary file: $tempName")
+                    } else {
+                        Log.e(TAG, "Failed to delete corrupted temporary file: $tempName")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error deleting corrupted temporary file", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error renaming file", e)
+            } else {
+                val finalName = tempName.removePrefix(BUSY_PREFIX)
+                try {
+                    if (tempFile.renameTo(finalName)) {
+                        Log.d(TAG, "File successfully renamed to $finalName")
+                    } else {
+                        Log.e(TAG, "Failed to rename file from $tempName to $finalName")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error renaming file", e)
+                }
             }
         }
     }
@@ -190,11 +205,20 @@ class OutputFileManager(
     private val dateTimeFormatter = DateTimeFormatter.ISO_DATE_TIME
     private fun dateTime() = dateTimeFormatter.format(LocalDateTime.now())
 
+    private fun getAvailableStorageBytes(): Long {
+        val stat = StatFs(Environment.getExternalStorageDirectory().path)
+        return stat.availableBytes
+    }
+
     class EncryptedFile(private val encryptedWriter: EncryptedWriter) {
         fun write(buffer: ByteArray) {
             var written = 0L
             while (written < buffer.size) {
-                written += encryptedWriter.write(buffer)
+                val bytesWritten = encryptedWriter.write(buffer.sliceArray(written.toInt()..buffer.size - 1))
+                if (bytesWritten <= 0) {
+                    throw RuntimeException("Failed to write to encrypted file: disk full or I/O error")
+                }
+                written += bytesWritten
             }
         }
 
@@ -203,30 +227,64 @@ class OutputFileManager(
         }
     }
 
-    class VideoFile(private val encryptedFile: EncryptedFile) {
+    inner class VideoFile(private val encryptedFile: EncryptedFile, private val onLowMemory: (() -> Unit)? = null) {
+        @Volatile private var isCorrupted = false
+        @Volatile private var stoppedDueToLowMemory = false
+
         fun writeVideoBuffer(data: ByteArray, presentationTimeStampUs: Long) {
-            val bb = ByteBuffer.allocate(1 + 8 + 4)
-            bb.order(ByteOrder.LITTLE_ENDIAN)
-            bb.put(1)
-            bb.putLong(presentationTimeStampUs)
-            bb.putInt(data.size)
-            encryptedFile.write(bb.array())
-            encryptedFile.write(data)
+            if (stoppedDueToLowMemory) return
+            if (getAvailableStorageBytes() < 100L * 1024 * 1024) {
+                Log.w("VideoFile", "Low memory detected, stopping recording")
+                stoppedDueToLowMemory = true
+                onLowMemory?.invoke()
+                return
+            }
+            try {
+                val bb = ByteBuffer.allocate(1 + 8 + 4)
+                bb.order(ByteOrder.LITTLE_ENDIAN)
+                bb.put(1)
+                bb.putLong(presentationTimeStampUs)
+                bb.putInt(data.size)
+                encryptedFile.write(bb.array())
+                encryptedFile.write(data)
+            } catch (e: Exception) {
+                Log.e("VideoFile", "Error writing video buffer", e)
+                isCorrupted = true
+            }
         }
 
         fun writeAudioBuffer(data: ByteArray, presentationTimeStampUs: Long) {
-            val bb = ByteBuffer.allocate(1 + 8 + 4)
-            bb.order(ByteOrder.LITTLE_ENDIAN)
-            bb.put(2)
-            bb.putLong(presentationTimeStampUs)
-            bb.putInt(data.size)
-            encryptedFile.write(bb.array())
-            encryptedFile.write(data)
+            if (stoppedDueToLowMemory) return
+            if (getAvailableStorageBytes() < 100L * 1024 * 1024) {
+                Log.w("VideoFile", "Low memory detected, stopping recording")
+                stoppedDueToLowMemory = true
+                onLowMemory?.invoke()
+                return
+            }
+            try {
+                val bb = ByteBuffer.allocate(1 + 8 + 4)
+                bb.order(ByteOrder.LITTLE_ENDIAN)
+                bb.put(2)
+                bb.putLong(presentationTimeStampUs)
+                bb.putInt(data.size)
+                encryptedFile.write(bb.array())
+                encryptedFile.write(data)
+            } catch (e: Exception) {
+                Log.e("VideoFile", "Error writing audio buffer", e)
+                isCorrupted = true
+            }
         }
 
         fun close() {
-            encryptedFile.close()
+            try {
+                encryptedFile.close()
+            } catch (e: Exception) {
+                Log.e("VideoFile", "Error closing encrypted file", e)
+                isCorrupted = true
+            }
         }
+
+        fun isCorrupted(): Boolean = isCorrupted
     }
 
     class ImageFile(private val encryptedFile: EncryptedFile) : OutputStream() {
