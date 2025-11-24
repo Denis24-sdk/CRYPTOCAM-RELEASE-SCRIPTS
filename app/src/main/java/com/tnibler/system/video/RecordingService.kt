@@ -432,15 +432,25 @@ class RecordingService : Service(), LifecycleOwner {
 
         val isBadAspectRatio = ratio < 1.5
 
+        // ПРОВЕРКА РАЗРЕШЕНИЯ: если запрошено 4K/2K но получено низкое разрешение, fallback на FHD
+        val requestedMaxDim = Math.max(params.resolution.width, params.resolution.height)
+        val actualMaxDim = Math.max(actualRes?.width ?: 0, actualRes?.height ?: 0)
+        val isLowResolution = (requestedMaxDim >= 2560 && actualMaxDim < 1920) // 4K/2K requested but got less than FHD
+
         var finalResolution = params.resolution
-
-
         var newRawBitRate = rawBitRate
 
-        if (isBadAspectRatio) {
-            Log.w(TAG, "Aspect Ratio mismatch! Got 4:3 ($actualRes). Forcing Vertical orientation of REQUESTED resolution.")
-            val minDim = Math.min(params.resolution.width, params.resolution.height)
-            val maxDim = Math.max(params.resolution.width, params.resolution.height)
+        if (isBadAspectRatio || isLowResolution) {
+            if (isBadAspectRatio) {
+                Log.w(TAG, "Aspect Ratio mismatch! Got 4:3 ($actualRes). Forcing Vertical orientation of REQUESTED resolution.")
+            }
+            if (isLowResolution) {
+                Log.w(TAG, "Low resolution fallback! Requested ${params.resolution} but got $actualRes. Falling back to FHD.")
+                finalResolution = Size(1920, 1080) // Fallback to FullHD
+            }
+
+            val minDim = Math.min(finalResolution.width, finalResolution.height)
+            val maxDim = Math.max(finalResolution.width, finalResolution.height)
             finalResolution = Size(minDim, maxDim)
 
             newRawBitRate = when {
@@ -462,7 +472,7 @@ class RecordingService : Service(), LifecycleOwner {
         val finalAdjustedBitRate = if (codec == MediaFormat.MIMETYPE_VIDEO_HEVC) (newRawBitRate * (1.0 - HEVC_BITRATE_REDUCTION_PERCENT / 100.0)).toInt() else newRawBitRate
 
 
-        if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio) && actualRes != null) {
+        if ((finalAdjustedBitRate != adjustedBitRate || isBadAspectRatio || isLowResolution) && actualRes != null) {
             Log.d(TAG, "Rebinding needed. NewBitrate=$finalAdjustedBitRate (Raw=$newRawBitRate), NewRes=$finalResolution, SurfaceRotation=$surfaceRotation")
             provider.unbind(videoCapture!!)
 
