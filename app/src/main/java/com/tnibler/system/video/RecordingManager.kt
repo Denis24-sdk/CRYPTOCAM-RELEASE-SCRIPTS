@@ -22,6 +22,7 @@ class RecordingManager(
     private val recordingStoppedCallback: (() -> Unit),
     private val onRecordingStarted: () -> Unit = {},
     private val onRecordingStopped: () -> Unit = {},
+    private val onLowMemoryStop: (() -> Unit) = {},
 ) {
     private val TAG = javaClass.simpleName
     var state: State = State.NOT_RECORDING
@@ -121,6 +122,7 @@ class RecordingManager(
                     // onLowMemory callback
                     Log.d(TAG, "Stopping recording due to low memory")
                     videoCapture.stopRecording()
+                    onLowMemoryStop()
                 }
                 this.videoFile = creationResult.videoFile
                 this.currentDocumentFile = creationResult.documentFile

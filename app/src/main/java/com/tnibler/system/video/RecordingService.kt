@@ -640,7 +640,14 @@ class RecordingService : Service(), LifecycleOwner {
                     }
                 },
                 onRecordingStarted = { vibrateOnStart() },
-                onRecordingStopped = { vibrateOnStop() }
+                onRecordingStopped = { vibrateOnStop() },
+                onLowMemoryStop = {
+                    vibrateOnStop()
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                    isInForeground = false
+                    stopServiceAfterRecording = true
+                }
             )
         }
 
@@ -680,6 +687,11 @@ class RecordingService : Service(), LifecycleOwner {
                     Log.w(TAG, "Storage space critically low during recording. Stopping.")
                     Toast.makeText(this@RecordingService, "Storage space critically low. Stopping recording.", Toast.LENGTH_LONG).show()
                     stopRecording()
+                    vibrateOnStop()
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                    isInForeground = false
+                    stopServiceAfterRecording = true
                     return
                 }
             }
