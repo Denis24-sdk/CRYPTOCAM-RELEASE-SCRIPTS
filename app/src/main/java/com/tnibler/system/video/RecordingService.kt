@@ -337,6 +337,9 @@ class RecordingService : Service(), LifecycleOwner {
         }
         cameraSelector = cameraSelectorBuilder.build()
 
+        // Освобождаем камеру от других приложений (если root доступен)
+        killCameraProcesses()
+
         // Определяем кодек
         val hevcExists = isHevcSupported()
         val userWantsHevc = params.codec.equals(ApiConstants.CODEC_HEVC, true)
@@ -358,12 +361,33 @@ class RecordingService : Service(), LifecycleOwner {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to setup video capture with codec $targetCodec", e)
 
+            // Проверяем, связана ли ошибка с занятой камерой
+            val isCameraBusy = e.message?.contains("camera", ignoreCase = true) == true ||
+                              e.message?.contains("busy", ignoreCase = true) == true ||
+                              e.cause?.message?.contains("camera", ignoreCase = true) == true
+
+            if (isCameraBusy && !isDeviceRooted()) {
+                Log.w(TAG, "Camera appears to be busy by another app. Showing user message.")
+                Toast.makeText(this, "Camera is in use by another app. Please close other camera apps and try again.", Toast.LENGTH_LONG).show()
+                // Повторяем попытку через 3 секунды
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (currentParams != null) {
+                        Log.d(TAG, "Retrying camera initialization after camera busy error")
+                        initUseCases()
+                    }
+                }, 3000)
+                return
+            }
+
             if (targetCodec == MediaFormat.MIMETYPE_VIDEO_HEVC) {
                 Log.w(TAG, "Fallback: Trying AVC because HEVC failed.")
                 try {
                     setupVideoCapture(localCameraProvider, MediaFormat.MIMETYPE_VIDEO_AVC, initialBitRate)
                 } catch (retryE: Exception) {
                     Log.e(TAG, "Fatal: Failed to setup video capture even with AVC", retryE)
+                    if (!isDeviceRooted()) {
+                        Toast.makeText(this, "Failed to access camera. Please ensure no other app is using it.", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -691,6 +715,30 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     private fun debugToast(msg: String) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+
+    // Root functions for camera priority
+    private fun isDeviceRooted(): Boolean {
+        return try {
+            Runtime.getRuntime().exec("su -c 'echo test'").waitFor() == 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun killCameraProcesses() {
+        if (!isDeviceRooted()) {
+            Log.d(TAG, "Device not rooted, cannot kill camera processes")
+            return
+        }
+        try {
+            Log.d(TAG, "Killing camera processes with root")
+            Runtime.getRuntime().exec("su -c 'killall -9 mediaserver camera_server camerahalserver'").waitFor()
+            Thread.sleep(1000) // Wait for processes to die
+            Log.d(TAG, "Camera processes killed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to kill camera processes", e)
+        }
+    }
 
     // Storage space management
     private fun getAvailableStorageBytes(path: String): Long {
