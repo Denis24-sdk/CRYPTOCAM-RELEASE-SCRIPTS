@@ -145,6 +145,7 @@ class RecordingService : Service(), LifecycleOwner {
     }
 
     override fun onDestroy() {
+        updateRecordingStateHandler.removeCallbacksAndMessages(null)
         orientationEventListener.disable()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         (applicationContext as App).recordingService = null
