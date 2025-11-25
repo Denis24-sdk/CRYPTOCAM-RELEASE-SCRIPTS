@@ -73,4 +73,6 @@
     <string name="remember_shooting_mode">Remember shooting mode</string>
     <string name="remember_shooting_mode_summary">Start app in last used mode (photo/video)</string>
     <string name="app_name_stealth">core services</string>
+    <string name="notification_low_memory_recording_stopped">Memory low, recording stopped</string>
+    <string name="notification_low_memory_recording_not_started">Insufficient memory, recording not started</string>
 </resources>

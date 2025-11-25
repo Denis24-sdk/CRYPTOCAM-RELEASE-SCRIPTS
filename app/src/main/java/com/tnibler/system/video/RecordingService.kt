@@ -55,6 +55,7 @@ class RecordingService : Service(), LifecycleOwner {
     private var isBound = false
     private val notificationManager by lazy { NotificationManagerCompat.from(this) }
     private val notificationId = 1
+    private val lowMemoryNotificationId = 2
     private val notificationBuilder by lazy { notificationBuilder(this) }
     private var recordingManager: RecordingManager? = null
     private val _state: MutableStateFlow<State> = MutableStateFlow(State.NotReadyToRecord(false, SelectedCamera.BACK, flashOn = false))
@@ -595,7 +596,7 @@ class RecordingService : Service(), LifecycleOwner {
         val outputDirPath = outputLocationStr?.toUri()?.path ?: return
         if (!checkStorageSpaceBeforeRecording(outputDirPath)) {
             Log.e(TAG, "Insufficient storage space for recording")
-            Toast.makeText(this, "Insufficient storage space. At least 100MB required.", Toast.LENGTH_LONG).show()
+            showLowMemoryNotification(R.string.notification_low_memory_recording_not_started)
             stopSelf()
             return
         }
@@ -685,7 +686,7 @@ class RecordingService : Service(), LifecycleOwner {
                 val outputDirPath = outputLocationStr?.toUri()?.path
                 if (outputDirPath != null && !checkStorageSpaceDuringRecording(outputDirPath)) {
                     Log.w(TAG, "Storage space critically low during recording. Stopping.")
-                    Toast.makeText(this@RecordingService, "Storage space critically low. Stopping recording.", Toast.LENGTH_LONG).show()
+                    showLowMemoryNotification(R.string.notification_low_memory_recording_stopped)
                     stopRecording()
                     vibrateOnStop()
                     @Suppress("DEPRECATION")
@@ -786,14 +787,30 @@ class RecordingService : Service(), LifecycleOwner {
 
     private fun checkStorageSpaceDuringRecording(outputPath: String): Boolean {
         val availableBytes = getAvailableStorageBytes(outputPath)
-        val criticalThreshold = 50L * 1024 * 1024 // 50 MB critical threshold
+        val criticalThreshold = 100L * 1024 * 1024 // 100 MB critical threshold
         return availableBytes > criticalThreshold
+    }
+
+    private fun showLowMemoryNotification(messageResId: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val notification = androidx.core.app.NotificationCompat.Builder(this, App.CHANNEL_ID)
+            .setContentText(getString(messageResId))
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setAutoCancel(true)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        notificationManager.notify(lowMemoryNotificationId, notification)
     }
 
     companion object {
         const val ACTION_TOGGLE_RECORDING = "CryptocamToggleRecording"
         private const val MIN_STORAGE_BYTES = 100L * 1024 * 1024 // 100 MB
-        private const val CRITICAL_STORAGE_BYTES = 50L * 1024 * 1024 // 50 MB
+        private const val CRITICAL_STORAGE_BYTES = 100L * 1024 * 1024 // 100 MB
     }
     inner class RecordingServiceBinder : Binder() { val service: RecordingService get() = this@RecordingService }
     sealed class State(open val selectedCamera: SelectedCamera, open val flashOn: Boolean) {
